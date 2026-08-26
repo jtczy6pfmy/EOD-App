@@ -1,4 +1,4 @@
-const CACHE_NAME="eod-inspection-v15";
+const CACHE_NAME="eod-inspection-v16";
 
 self.addEventListener("install",event=>{
  event.waitUntil(self.skipWaiting());
@@ -27,6 +27,33 @@ self.addEventListener("fetch",event=>{
  if(isNavigation){
   event.respondWith(
    fetch(event.request,{cache:"no-store"})
+    .then(async response=>{
+     if(!response || !response.ok) return response;
+
+     const contentType=response.headers.get("content-type")||"";
+     if(!contentType.includes("text/html")) return response;
+
+     let html=await response.text();
+
+     // Prevent accidental app resets from browser hard-refresh shortcuts.
+     const resetHandlerStart='// Global keydown handler for Ctrl + F5';
+     const resetHandlerEnd='/* =========================================================\n   PREFIX DROPDOWN';
+     const resetStart=html.indexOf(resetHandlerStart);
+     const resetEnd=html.indexOf(resetHandlerEnd,resetStart);
+     if(resetStart!==-1 && resetEnd!==-1){
+      html=html.slice(0,resetStart)+html.slice(resetEnd);
+     }
+
+     // The only automatic reset is now tied to the EOD email action.
+     html=html.replace(
+      " window.location.href = mailtoUrl;",
+      " window.location.href = mailtoUrl;\n setTimeout(()=>performHardReset(),1500);"
+     );
+
+     const headers=new Headers(response.headers);
+     headers.set("Cache-Control","no-store");
+     return new Response(html,{status:response.status,statusText:response.statusText,headers});
+    })
     .catch(()=>caches.match(event.request))
   );
   return;

@@ -1,49 +1,52 @@
-/* Supabase persistence layer for EOD-App. Direct cloud backup after every add action. */
+/* EOD-App cloud backup: localStorage remains the working copy; Supabase is updated from it continuously. */
 (()=>{
   "use strict";
   const SUPABASE_URL="https://tjhsrydhkigvhlllnstm.supabase.co";
   const SUPABASE_KEY="sb_publishable_nB2sQ-lTf9mJrmb6UWn4vw_gLlsnYbv";
-  const TABLE="eod_daily",REST_URL=`${SUPABASE_URL}/rest/v1/${TABLE}`;
+  const REST_URL=`${SUPABASE_URL}/rest/v1/eod_daily`;
   const HEADERS={apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json"};
-  const appDate=d=>{d=d||new Date();return(d.getMonth()+1)+"/"+d.getDate()+"/"+String(d.getFullYear()).slice(-2)};
-  const isoDate=v=>{const m=String(v).match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);return m?`20${m[3]}-${String(m[1]).padStart(2,"0")}-${String(m[2]).padStart(2,"0")}`:null};
-  function findLocal(){const today=appDate();for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(!key||!key.startsWith("eodInspectionReport_v13_"))continue;try{const state=JSON.parse(localStorage.getItem(key));if(state&&state.date===today&&state.terminal)return{key,state}}catch(e){}}return null}
-  async function cloudWrite(state){const date=isoDate(state.date);if(!date||!state.terminal)return false;const r=await fetch(`${REST_URL}?on_conflict=report_date,terminal`,{method:"POST",headers:{...HEADERS,Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({report_date:date,terminal:state.terminal,app_state:state})});if(!r.ok)throw Error("Supabase save "+r.status);return true}
-
-  const pending=new Map(),running=new Set();
-  function queueCloudWrite(state){
-    const date=isoDate(state.date);if(!date||!state.terminal)return;
-    const key=`${date}|${state.terminal}`;pending.set(key,state);if(running.has(key))return;
-    running.add(key);
-    (async()=>{try{while(pending.has(key)){const next=pending.get(key);pending.delete(key);try{await cloudWrite(next)}catch(e){console.warn("EOD cloud save failed",e);pending.set(key,next);break}}}finally{running.delete(key)}})();
+  const PREFIX="eodInspectionReport_v13_";
+  let lastSignature="";
+  let saving=false;
+  let retryTimer=null;
+  function dateISO(v){const m=String(v||"").match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);return m?`20${m[3]}-${String(m[1]).padStart(2,"0")}-${String(m[2]).padStart(2,"0")}`:null}
+  function today(){const d=new Date();return `${d.getMonth()+1}/${d.getDate()}/${String(d.getFullYear()).slice(-2)}`}
+  function getCurrentState(){
+    const candidates=[];
+    for(let i=0;i<localStorage.length;i++){
+      const key=localStorage.key(i); if(!key||!key.startsWith(PREFIX))continue;
+      try{const state=JSON.parse(localStorage.getItem(key));if(state&&state.date===today()&&state.terminal)candidates.push(state)}catch(e){}
+    }
+    return candidates.length?candidates[candidates.length-1]:null;
   }
-
-  function backupCurrentState(){const local=findLocal();if(local)queueCloudWrite(local.state)}
-
-  function installSaveHook(){
-    const original=Storage.prototype.setItem;
-    Storage.prototype.setItem=function(key,value){
-      const result=original.call(this,key,value);
-      if(key&&key.startsWith("eodInspectionReport_v13_")){try{const state=JSON.parse(value);if(state&&state.date===appDate()&&state.terminal)queueCloudWrite(state)}catch(e){}}
-      return result;
-    };
+  async function writeCloud(state){
+    const report_date=dateISO(state.date); if(!report_date||!state.terminal)return false;
+    const response=await fetch(`${REST_URL}?on_conflict=report_date,terminal`,{
+      method:"POST",headers:{...HEADERS,Prefer:"resolution=merge-duplicates,return=minimal"},
+      body:JSON.stringify({report_date,terminal:state.terminal,app_state:state}),cache:"no-store",keepalive:true
+    });
+    if(!response.ok){const text=await response.text().catch(()=>"");throw new Error(`Supabase ${response.status}${text?": "+text.slice(0,200):""}`)}
+    return true;
   }
-
-  function installDirectAddBackup(){
-    const ids=["addInspection","addContainerInspection","addRackInspection","addTireAudits"];
-    document.addEventListener("click",event=>{
-      const button=event.target.closest("button");
-      if(!button||!ids.includes(button.id))return;
-      setTimeout(backupCurrentState,50);
-    },true);
+  async function syncNow(){
+    if(saving)return;
+    const state=getCurrentState(); if(!state)return;
+    const signature=JSON.stringify(state); if(signature===lastSignature)return;
+    saving=true;
+    try{await writeCloud(state);lastSignature=signature;window.dispatchEvent(new CustomEvent("eod-cloud-saved",{detail:{ok:true}}));console.log("EOD: backed up to Supabase")}
+    catch(error){console.warn("EOD: Supabase backup failed; retrying",error);clearTimeout(retryTimer);retryTimer=setTimeout(()=>{lastSignature="";syncNow()},3000)}
+    finally{saving=false}
   }
-
-  function installEnterHandlers(){
-    const actions={tireAuditTotal:"addTireAudits",number:"addInspection",containerNumber:"addContainerInspection",rackNumber:"addRackInspection"};
-    Object.entries(actions).forEach(([inputId,buttonId])=>{const input=document.getElementById(inputId),button=document.getElementById(buttonId);if(!input||!button)return;input.addEventListener("keydown",event=>{if(event.key==="Enter"){event.preventDefault();button.click()}})});
-  }
-
-  async function startup(){const local=findLocal();if(!local)return;try{queueCloudWrite(local.state)}catch(e){console.warn("EOD startup backup failed",e)}}
-  installSaveHook();
-  window.addEventListener("load",()=>{installEnterHandlers();installDirectAddBackup();setTimeout(startup,500)});
+  const originalSetItem=Storage.prototype.setItem;
+  Storage.prototype.setItem=function(key,value){
+    const result=originalSetItem.call(this,key,value);
+    if(key&&key.startsWith(PREFIX)){lastSignature="";clearTimeout(retryTimer);retryTimer=setTimeout(syncNow,100)}
+    return result;
+  };
+  setInterval(syncNow,1000);
+  window.addEventListener("online",()=>{lastSignature="";syncNow()});
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden){lastSignature="";syncNow()}});
+  window.addEventListener("pagehide",()=>{const state=getCurrentState();if(state)writeCloud(state).catch(()=>{})});
+  window.EODCloud={syncNow,backupCurrentState:syncNow};
+  setTimeout(syncNow,500);
 })();

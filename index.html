@@ -39,7 +39,7 @@ function formatDate(d=new Date()){return (d.getMonth()+1)+"/"+d.getDate()+"/"+St
 function reportDateLong(d=new Date()){return d.toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric"})}
 const TODAY=formatDate(new Date()),TODAY_LONG=reportDateLong(new Date());
 const EMAIL_TO="joe@caliberis.com";
-const STANDARD_CC=["dgeists@caliberis.com","jdoan@aspectassociates.com"];
+const STANDARD_CC=["dgeist@caliberis.com","jdoan@aspectassociates.com"];
 const CALUMET_CC=["pjasinki@aspectassociates.com","tmitchell@aspectassociates.com","bstenson@aspectassociates.com","bkubinski@aspectassociates.com","dneubauer@aspectassociates.com","asanjuan@aspectassociates.com"];
 const SPECIAL=["CALUMET","LANDERS","CHGO 63RD","CHICAGO 47TH"],BASE=["NSPZ","NSFZ"],EXTRA=["TSXZ","LSFZ","TSFZ","TSNZ","PAHZ","PBRZ","UPDZ","UPHZ","DDRZ","DDTZ","DDGZ"];
 let data={chassis:{"5652":{"Pre-repair":[],"Post-repair":[],"Add-on":[]},"5900":{"Pre-repair":[],"Post-repair":[],"Add-on":[]},"5658":{"Pre-repair":[],"Post-repair":[],"Add-on":[]}},containers:{"5653":{"Pre-repair":[],"Post-repair":[],"Add-on":[]},"5900":{"Pre-repair":[],"Post-repair":[],"Add-on":[]},"5658":{"Pre-repair":[],"Post-repair":[],"Add-on":[]}},racks:{"5657":{"Pre-repair":[]}},tireAudits:0};

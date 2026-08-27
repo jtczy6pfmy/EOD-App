@@ -58,11 +58,10 @@
       const after=JSON.stringify(combined);
       writeLocal(combined);
 
-      // index.html may already have rendered before the async cloud request
-      // completed. Reload exactly once after recovery so its normal load()
-      // reads the recovered daily record and renders the real inspection list.
       if(after!==before && cloud && !sessionStorage.getItem("eod_recovered_once")){
         sessionStorage.setItem("eod_recovered_once","1");
+        // The page has already initialized by the time this runs. Reload once
+        // so index.html reads the recovered daily record and renders it.
         window.location.reload();
         return;
       }
@@ -89,6 +88,14 @@
   document.addEventListener("visibilitychange",()=>{if(!document.hidden){lastUploadedSignature="";recoverAndSync()}});
   window.addEventListener("pagehide",()=>{const s=readLocal();if(s)upload(s).catch(()=>{})});
   window.EODCloud={syncNow:recoverAndSync,backupCurrentState:recoverAndSync};
-  setTimeout(recoverAndSync,300);
-  setInterval(recoverAndSync,5000);
+
+  // Critical startup fix: wait until the HTML controls exist before querying
+  // Supabase. Previously the recovery request could run while #terminal was
+  // not yet in the document, making startup timing-dependent on iOS Safari.
+  const start=()=>{
+    setTimeout(recoverAndSync,100);
+    setInterval(recoverAndSync,5000);
+  };
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start,{once:true});
+  else start();
 })();

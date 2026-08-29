@@ -25,14 +25,15 @@ function injectStyles(){
       background-image:linear-gradient(
         110deg,
         var(--milestone-color,#ffc107) 0%,
-        var(--milestone-color,#ffc107) 36%,
-        var(--milestone-highlight,#ffe47a) 48%,
-        var(--milestone-color,#ffc107) 60%,
+        var(--milestone-color,#ffc107) 38%,
+        var(--milestone-highlight,#ffe47a) 49%,
+        var(--milestone-highlight,#ffe47a) 51%,
+        var(--milestone-color,#ffc107) 62%,
         var(--milestone-color,#ffc107) 100%
       );
       background-size:220% 100%;
       animation:eodBarHighlight 2.4s linear infinite;
-      box-shadow:0 0 8px color-mix(in srgb,var(--milestone-color,#ffc107) 55%,transparent);
+      box-shadow:0 0 8px var(--milestone-glow,#ffc107);
     }
 
     @keyframes eodBarHighlight{
@@ -106,15 +107,13 @@ function update(total,initial=false){
   const fill=document.getElementById("fill");
 
   if(fill){
-    fill.style.setProperty("--milestone-color",getColor(count));
-    fill.style.setProperty("--milestone-highlight",getHighlight(count));
-    fill.style.backgroundColor=getColor(count);
+    const color=getColor(count);
+    const highlight=getHighlight(count);
+    fill.style.setProperty("--milestone-color",color);
+    fill.style.setProperty("--milestone-highlight",highlight);
+    fill.style.setProperty("--milestone-glow",color);
+    fill.style.backgroundColor=color;
     fill.classList.add("milestone-pulse");
-    if(MILESTONES[count]){
-      fill.classList.remove("milestone-pulse");
-      void fill.offsetWidth;
-      fill.classList.add("milestone-pulse");
-    }
   }
 
   if(initial){

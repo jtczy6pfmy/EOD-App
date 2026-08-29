@@ -3,10 +3,10 @@
 
 const TARGET=28;
 const MILESTONES={
-  7:{icon:"🎯",title:"25% COMPLETE!",subtitle:"7 / 28 INSPECTIONS",color:"#22B7F0"},
-  14:{icon:"👽",title:"50% COMPLETE!",subtitle:"14 / 28 INSPECTIONS",color:"#65D64A"},
-  21:{icon:"⚡",title:"75% COMPLETE!",subtitle:"21 / 28 INSPECTIONS",color:"#FF7A35"},
-  28:{icon:"🏆",title:"DAILY TARGET COMPLETE!",subtitle:"28 / 28 INSPECTIONS",color:"#F04B32"}
+  7:{icon:"🎯",title:"25% COMPLETE!",subtitle:"7 / 28 INSPECTIONS",color:"#22B7F0",highlight:"#A8EEFF"},
+  14:{icon:"👽",title:"50% COMPLETE!",subtitle:"14 / 28 INSPECTIONS",color:"#65D64A",highlight:"#C8FFB8"},
+  21:{icon:"⚡",title:"75% COMPLETE!",subtitle:"21 / 28 INSPECTIONS",color:"#FF7A35",highlight:"#FFD0A8"},
+  28:{icon:"🏆",title:"DAILY TARGET COMPLETE!",subtitle:"28 / 28 INSPECTIONS",color:"#F04B32",highlight:"#FFB0A5"}
 };
 
 let lastTotal=null;
@@ -19,7 +19,27 @@ function injectStyles(){
   styleInjected=true;
   const style=document.createElement("style");
   style.textContent=`
-    .fill.milestone-pulse{animation:eodPulse .75s ease 2}
+    .fill.milestone-pulse{
+      position:relative;
+      overflow:hidden;
+      background-image:linear-gradient(
+        110deg,
+        var(--milestone-color,#ffc107) 0%,
+        var(--milestone-color,#ffc107) 36%,
+        var(--milestone-highlight,#ffe47a) 48%,
+        var(--milestone-color,#ffc107) 60%,
+        var(--milestone-color,#ffc107) 100%
+      );
+      background-size:220% 100%;
+      animation:eodBarHighlight 2.4s linear infinite;
+      box-shadow:0 0 8px color-mix(in srgb,var(--milestone-color,#ffc107) 55%,transparent);
+    }
+
+    @keyframes eodBarHighlight{
+      from{background-position:200% 0}
+      to{background-position:-20% 0}
+    }
+
     .eod-milestone{
       min-height:168px;display:flex;flex-direction:column;align-items:center;
       justify-content:center;text-align:center;border-radius:10px;color:#fff;
@@ -29,7 +49,6 @@ function injectStyles(){
     .eod-milestone-icon{font-size:3.6rem;line-height:1;margin-bottom:8px;animation:eodIconBounce .8s ease-in-out infinite alternate}
     .eod-milestone-title{font-size:1.45rem;font-weight:900;letter-spacing:.7px}
     .eod-milestone-subtitle{margin-top:6px;font-size:.9rem;font-weight:800;letter-spacing:.8px;opacity:.95}
-    @keyframes eodPulse{50%{transform:scaleY(1.55);filter:brightness(1.25)}}
     @keyframes eodMilestoneIn{from{opacity:0;transform:scale(.88)}to{opacity:1;transform:scale(1)}}
     @keyframes eodIconBounce{from{transform:translateY(0) scale(1)}to{transform:translateY(-7px) scale(1.08)}}
   `;
@@ -41,7 +60,15 @@ function getColor(total){
   if(total>=21)return MILESTONES[21].color;
   if(total>=14)return MILESTONES[14].color;
   if(total>=7)return MILESTONES[7].color;
-  return "#22B7F0";
+  return "#ffc107";
+}
+
+function getHighlight(total){
+  if(total>=28)return MILESTONES[28].highlight;
+  if(total>=21)return MILESTONES[21].highlight;
+  if(total>=14)return MILESTONES[14].highlight;
+  if(total>=7)return MILESTONES[7].highlight;
+  return "#FFE47A";
 }
 
 function highestReached(total){
@@ -79,10 +106,15 @@ function update(total,initial=false){
   const fill=document.getElementById("fill");
 
   if(fill){
+    fill.style.setProperty("--milestone-color",getColor(count));
+    fill.style.setProperty("--milestone-highlight",getHighlight(count));
     fill.style.backgroundColor=getColor(count);
-    fill.classList.remove("milestone-pulse");
-    void fill.offsetWidth;
-    if(MILESTONES[count])fill.classList.add("milestone-pulse");
+    fill.classList.add("milestone-pulse");
+    if(MILESTONES[count]){
+      fill.classList.remove("milestone-pulse");
+      void fill.offsetWidth;
+      fill.classList.add("milestone-pulse");
+    }
   }
 
   if(initial){
@@ -108,5 +140,5 @@ if(document.readyState==="loading"){
   watchCount();
 }
 
-window.EODMilestones={update,getColor,TARGET};
+window.EODMilestones={update,getColor,getHighlight,TARGET};
 })();

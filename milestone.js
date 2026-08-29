@@ -144,6 +144,7 @@ function wireInspectionEnter(){
   wireEnterToButton("containerNote","addContainerInspection");
   wireEnterToButton("rackNumber","addRackInspection");
   wireEnterToButton("rackNote","addRackInspection");
+  wireEnterToButton("tireAuditTotal","addTireAudits");
 }
 
 function watchCount(){

@@ -126,11 +126,32 @@ function update(total,initial=false){
   lastTotal=count;
 }
 
+function wireEnterToButton(inputId,buttonId){
+  const input=document.getElementById(inputId);
+  const button=document.getElementById(buttonId);
+  if(!input||!button)return;
+  input.addEventListener("keydown",event=>{
+    if(event.key!=="Enter")return;
+    event.preventDefault();
+    button.click();
+  });
+}
+
+function wireInspectionEnter(){
+  wireEnterToButton("number","addInspection");
+  wireEnterToButton("equipmentNote","addInspection");
+  wireEnterToButton("containerNumber","addContainerInspection");
+  wireEnterToButton("containerNote","addContainerInspection");
+  wireEnterToButton("rackNumber","addRackInspection");
+  wireEnterToButton("rackNote","addRackInspection");
+}
+
 function watchCount(){
   const count=document.getElementById("count");
   if(!count){requestAnimationFrame(watchCount);return}
   update(Number.parseInt(count.textContent,10)||0,true);
   new MutationObserver(()=>update(Number.parseInt(count.textContent,10)||0,false)).observe(count,{childList:true,characterData:true,subtree:true});
+  wireInspectionEnter();
 }
 
 if(document.readyState==="loading"){

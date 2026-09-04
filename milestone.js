@@ -1,12 +1,22 @@
-(()=>{
+(() => {
 "use strict";
 
-const TARGET=28;
-const MILESTONES={
-  7:{icon:"🎯",title:"25% COMPLETE!",subtitle:"7 / 28 INSPECTIONS",color:"#22B7F0",highlight:"#A8EEFF"},
-  14:{icon:"👽",title:"50% COMPLETE!",subtitle:"14 / 28 INSPECTIONS",color:"#65D64A",highlight:"#C8FFB8"},
-  21:{icon:"⚡",title:"75% COMPLETE!",subtitle:"21 / 28 INSPECTIONS",color:"#FF7A35",highlight:"#FFD0A8"},
-  28:{icon:"🏆",title:"DAILY TARGET COMPLETE!",subtitle:"28 / 28 INSPECTIONS",color:"#F04B32",highlight:"#FFB0A5"}
+const isHarrisburg = window.location.pathname.includes("harrisburg") || 
+                     (typeof CURRENT_LOCATION !== "undefined" && CURRENT_LOCATION === "harrisburg") ||
+                     (localStorage.getItem("eod_location") === "harrisburg");
+
+const TARGET = isHarrisburg ? 30 : 28;
+
+const MILESTONES = isHarrisburg ? {
+  8: { icon: "🎯", title: "25% COMPLETE!", subtitle: "8 / 30 INSPECTIONS", color: "#22B7F0", highlight: "#A8EEFF" },
+  15:  { icon: "👽", title: "50% COMPLETE!", subtitle: "15 / 30 INSPECTIONS", color: "#65D64A", highlight: "#C8FFB8" },
+  23:{ icon: "⚡", title: "75% COMPLETE!", subtitle: "23 / 30 INSPECTIONS", color: "#FF7A35", highlight: "#FFD0A8" },
+  30:  { icon: "🏆", title: "DAILY TARGET COMPLETE!", subtitle: "30 / 30 INSPECTIONS", color: "#F04B32", highlight: "#FFB0A5" }
+} : {
+  7:   { icon: "🎯", title: "25% COMPLETE!", subtitle: "7 / 28 INSPECTIONS", color: "#22B7F0", highlight: "#A8EEFF" },
+  14:  { icon: "👽", title: "50% COMPLETE!", subtitle: "14 / 28 INSPECTIONS", color: "#65D64A", highlight: "#C8FFB8" },
+  21:  { icon: "⚡", title: "75% COMPLETE!", subtitle: "21 / 28 INSPECTIONS", color: "#FF7A35", highlight: "#FFD0A8" },
+  28:  { icon: "🏆", title: "DAILY TARGET COMPLETE!", subtitle: "28 / 28 INSPECTIONS", color: "#F04B32", highlight: "#FFB0A5" }
 };
 
 let lastTotal=null;
@@ -57,23 +67,24 @@ function injectStyles(){
 }
 
 function getColor(total){
-  if(total>=28)return MILESTONES[28].color;
-  if(total>=21)return MILESTONES[21].color;
-  if(total>=14)return MILESTONES[14].color;
-  if(total>=7)return MILESTONES[7].color;
+  const marks = Object.keys(MILESTONES).map(Number).sort((a, b) => b - a);
+  for (const mark of marks) {
+    if (total >= mark) return MILESTONES[mark].color;
+  }
   return "#ffc107";
 }
 
 function getHighlight(total){
-  if(total>=28)return MILESTONES[28].highlight;
-  if(total>=21)return MILESTONES[21].highlight;
-  if(total>=14)return MILESTONES[14].highlight;
-  if(total>=7)return MILESTONES[7].highlight;
+  const marks = Object.keys(MILESTONES).map(Number).sort((a, b) => b - a);
+  for (const mark of marks) {
+    if (total >= mark) return MILESTONES[mark].highlight;
+  }
   return "#FFE47A";
 }
 
 function highestReached(total){
-  return [7,14,21,28].filter(mark=>total>=mark).pop()||0;
+  const marks = Object.keys(MILESTONES).map(Number);
+  return marks.filter(mark => total >= mark).pop() || 0;
 }
 
 function showInTerminal(m){

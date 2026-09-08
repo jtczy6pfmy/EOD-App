@@ -16,7 +16,6 @@ if(isReload&&sessionStorage.getItem(RELOAD_RESET_FLAG)!=="1"){
 
 sessionStorage.removeItem(RELOAD_RESET_FLAG);
 
-// Dynamically compute milestone steps based on the current target
 function getTarget() {
  const terminalSelect = document.getElementById("terminal");
  const val = terminalSelect ? terminalSelect.value : "";
@@ -27,16 +26,24 @@ function getTarget() {
 
 function getMilestones() {
  const target = getTarget();
- const m1 = Math.round(target * 0.25);
- const m2 = Math.round(target * 0.50);
- const m3 = Math.round(target * 0.75);
- const m4 = target;
+ let m1, m2, m3;
+
+ if (target === 30) {
+  // Harrisburg custom milestones
+  m1 = 8; m2 = 15; m3 = 23;
+ } else if (target === 26) {
+  // Chicago yards milestones
+  m1 = 7; m2 = 13; m3 = 19;
+ } else {
+  // Default 28 milestones
+  m1 = 7; m2 = 14; m3 = 21;
+ }
 
  const milestones = {};
- milestones[m1] = { icon: "🎯", title: "25% COMPLETE!", subtitle: `${m1} / ${target} INSPECTIONS`, color: "#22B7F0" };
- milestones[m2] = { icon: "👽", title: "50% COMPLETE!", subtitle: `${m2} / ${target} INSPECTIONS`, color: "#65D64A" };
- milestones[m3] = { icon: "⚡", title: "75% COMPLETE!", subtitle: `${m3} / ${target} INSPECTIONS`, color: "#FF7A35" };
- milestones[m4] = { icon: "🏆", title: "DAILY TARGET COMPLETE!", subtitle: `${m4} / ${target} INSPECTIONS`, color: "#F04B32" };
+ milestones[m1] = { icon: "🎯", title: "FIRST MILESTONE!", subtitle: `${m1} / ${target} INSPECTIONS`, color: "#22B7F0" };
+ milestones[m2] = { icon: "👽", title: "HALFWAY THERE!", subtitle: `${m2} / ${target} INSPECTIONS`, color: "#65D64A" };
+ milestones[m3] = { icon: "⚡", title: "ALMOST DONE!", subtitle: `${m3} / ${target} INSPECTIONS`, color: "#FF7A35" };
+ milestones[target] = { icon: "🏆", title: "DAILY TARGET COMPLETE!", subtitle: `${target} / ${target} INSPECTIONS`, color: "#F04B32" };
  return milestones;
 }
 

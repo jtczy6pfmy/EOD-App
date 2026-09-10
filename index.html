@@ -92,7 +92,11 @@ function buildReportText(){
    if(defects.length===0)txt+=`1.\n\n`;
   });
  });
- txt+=`\n(${inspectionTotal()}) TOTAL INSPECTIONS\n\nComments or Notes of Interest`;
+ 
+ const tireAuditsCount = Number(data.tireAudits) || 0;
+ txt+=`\nTIRE AUDITS\n\nTotal Tire Audits: ${tireAuditsCount}\n\n`;
+
+ txt+=`\n(${total()}) TOTAL INSPECTIONS\n\nComments or Notes of Interest`;
  if(notes.value.trim())txt+=`\n\n${notes.value.trim()}`;
  return txt;
 }

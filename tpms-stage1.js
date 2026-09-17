@@ -1,131 +1,204 @@
 (()=>{
   "use strict";
 
-  // Stage 1 only: visual/layout separation.
-  // No Goodyear API, authentication, chassis lookup, or inspection interception is performed here.
-  // This module is intentionally isolated from the existing EOD inspection logic.
-
+  const GOODYEAR_TPMS_URL="https://tiretrac.ap.goodyear.com/WebApp/Membership/Login.aspx?ReturnUrl=%2F";
   const STYLE_ID="eod-tpms-stage1-style";
-  const TPMS_ID="eod-tpms-stage1-card";
-  const EQUIPMENT_ID="eod-equipment-stage1-row";
-
-  function findCard(title){
-    return [...document.querySelectorAll("main.app .card")].find(card=>
-      card.querySelector("h2")?.textContent?.trim()===title
-    );
-  }
+  const TPMS_ID="eodTpmsCard";
 
   function ensureStyles(){
     if(document.getElementById(STYLE_ID))return;
+
     const style=document.createElement("style");
     style.id=STYLE_ID;
     style.textContent=`
-      #${TPMS_ID} .tpms-stage1-body{display:flex;flex-direction:column;gap:12px}
-      #${TPMS_ID} .tpms-stage1-status{padding:12px;border:1px solid #d1d9e6;border-radius:8px;background:#f8fafc;font-weight:700;color:#334155}
-      #${TPMS_ID} .tpms-stage1-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-      #${TPMS_ID} .tpms-stage1-actions{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-      #${TPMS_ID} button{width:100%}
-      #${EQUIPMENT_ID}{grid-column:span 2;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
-      #${EQUIPMENT_ID}>.card{min-width:0}
+      /* TPMS enhancement owns only the TPMS card. It does not rearrange the EOD grid. */
+      .eod-tpms-card{grid-area:tpms!important}
+      .eod-tpms-card .card-header-styled{display:flex;align-items:center;justify-content:space-between}
+      .eod-tpms-badge{font-size:.68rem;font-weight:900;letter-spacing:.6px;padding:5px 8px;border-radius:999px;background:#334155;color:#fff}
+      .eod-tpms-badge.unlocked{background:#198754}
+      .eod-tpms-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+      .eod-tpms-actions{display:flex;gap:10px;align-items:end}
+      .eod-tpms-actions button{width:auto;min-width:150px}
+      .eod-tpms-status{display:none;padding:10px 12px;border-radius:8px;font-weight:800;font-size:.82rem}
+      .eod-tpms-status.show{display:block;background:#ecfdf3;color:#166534;border:1px solid #bbf7d0}
+      .eod-tpms-lock{font-size:.78rem;color:#64748b;margin-top:-3px}
+      .eod-tpms-open{display:none}
+      .eod-tpms-open.show{display:block}
+      .eod-tpms-note{margin:0;font-size:.78rem;color:#64748b;line-height:1.45}
+      .eod-tpms-modal{position:fixed;inset:0;z-index:99999;display:none;align-items:center;justify-content:center;background:rgba(0,13,38,.58);padding:18px}
+      .eod-tpms-modal.show{display:flex}
+      .eod-tpms-dialog{width:min(500px,100%);background:#fff;border-radius:12px;box-shadow:0 18px 55px rgba(0,0,0,.3);overflow:hidden}
+      .eod-tpms-dialog-head{background:linear-gradient(90deg,#001f54,#002b6d);color:#fff;padding:14px 16px;font-weight:900}
+      .eod-tpms-dialog-body{padding:18px}
+      .eod-tpms-dialog-body p{margin:0 0 14px;line-height:1.5;color:#334155}
+      .eod-tpms-dialog-actions{display:flex;gap:10px;margin-top:16px}
+      .eod-tpms-dialog-actions button{flex:1}
+      .eod-tpms-cancel{background:#e2e8f0!important;color:#1e293b!important}
+      .eod-tpms-confirm{background:#198754!important;color:#fff!important}
+      .eod-tpms-warning{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;padding:9px 11px;border-radius:8px;font-size:.78rem;font-weight:700;margin-top:10px}
       @media(max-width:768px){
-        #${EQUIPMENT_ID}{grid-column:span 1;grid-template-columns:1fr}
-        #${TPMS_ID} .tpms-stage1-grid,#${TPMS_ID} .tpms-stage1-actions{grid-template-columns:1fr}
+        .eod-tpms-grid{grid-template-columns:1fr}
+        .eod-tpms-actions{flex-direction:column;align-items:stretch}
+        .eod-tpms-actions button{width:100%}
       }
     `;
     document.head.appendChild(style);
   }
 
-  function buildTpmsCard(){
-    if(document.getElementById(TPMS_ID))return document.getElementById(TPMS_ID);
+  function removeOldStaticTpms(){
+    /* The index previously contained a static Detailed Tire and Gateway Status card.
+       That card occupied the same grid area as the login card and caused the GUI to
+       appear overridden/duplicated. The TPMS enhancement is now the single TPMS card. */
+    document.querySelectorAll("main.app .tpms-section").forEach(el=>el.remove());
+  }
+
+  function makeTpmsCard(){
+    if(document.getElementById(TPMS_ID))return;
+
     const card=document.createElement("section");
-    card.className="card card-full-width";
     card.id=TPMS_ID;
+    card.className="card eod-tpms-card";
+
     card.innerHTML=`
-      <div class="card-header-styled"><h2>TPMS</h2></div>
-      <div class="card-body tpms-stage1-body">
-        <div class="tpms-stage1-grid">
-          <div>
-            <label>Chassis</label>
-            <div id="tpmsStage1Chassis" class="tpms-stage1-status">Enter a chassis in the Chassis section below.</div>
+      <div class="card-header-styled">
+        <h2>TPMS</h2>
+        <span class="eod-tpms-badge" id="tpmsBadge">LOCKED</span>
+      </div>
+      <div class="card-body">
+        <div id="tpmsLoginArea">
+          <div class="eod-tpms-grid">
+            <div>
+              <label>TPMS Username</label>
+              <input id="tpmsUsername" autocomplete="username" placeholder="Enter TPMS username">
+            </div>
+            <div>
+              <label>TPMS Password</label>
+              <input id="tpmsPassword" type="password" autocomplete="current-password" placeholder="Enter TPMS password">
+            </div>
           </div>
-          <div>
-            <label>Status</label>
-            <div id="tpmsStage1Status" class="tpms-stage1-status">NOT CONNECTED</div>
+          <div class="eod-tpms-actions" style="margin-top:12px">
+            <button id="tpmsLoginButton">UNLOCK TPMS</button>
           </div>
+          <div class="eod-tpms-lock">Credentials are kept only for this browser session and are not saved by this enhancement.</div>
         </div>
-        <div class="tpms-stage1-status">
-          Stage 1 is layout-only. Goodyear Mobility Cloud authentication and TPMS data retrieval will be added separately after the layout is confirmed.
-        </div>
-        <div class="tpms-stage1-actions">
-          <button type="button" id="tpmsStage1Check">CHECK TPMS</button>
-          <button type="button" id="tpmsStage1Screenshot" class="secondary">GENERATE TPMS SCREENSHOT</button>
+
+        <div id="tpmsUnlockedArea" class="eod-tpms-open">
+          <div class="eod-tpms-status show">✓ TPMS access unlocked for this session.</div>
+          <div class="eod-tpms-actions" style="margin-top:12px">
+            <button id="tpmsOpenCloud">OPEN GOODYEAR TPMS</button>
+            <button id="tpmsLockButton" class="secondary">LOCK TPMS</button>
+          </div>
+          <p class="eod-tpms-note">Use the TPMS cloud to pull the chassis data and capture the required screenshot for the work order. The EOD app does not automatically submit or change TPMS information.</p>
         </div>
       </div>`;
-    return card;
-  }
 
-  function groupEquipment(){
     const app=document.querySelector("main.app");
-    if(!app)return false;
-    if(document.getElementById(EQUIPMENT_ID))return true;
-    const chassis=findCard("Chassis");
-    const racks=findCard("Chassis Racks");
-    const containers=findCard("Containers");
-    if(!chassis||!racks||!containers)return false;
-    const row=document.createElement("div");
-    row.id=EQUIPMENT_ID;
-    row.append(chassis,racks,containers);
-    app.appendChild(row);
-    return true;
-  }
+    const chassis=document.getElementById("addInspection")?.closest("section.card");
 
-  function placeTpms(){
-    const app=document.querySelector("main.app");
-    const tpms=buildTpmsCard();
-    if(!app||!tpms)return false;
-    if(!document.getElementById(TPMS_ID))app.appendChild(tpms);
-    const equipment=document.getElementById(EQUIPMENT_ID);
-    if(equipment){
-      app.insertBefore(tpms,equipment);
-    }else{
-      app.appendChild(tpms);
+    if(app){
+      app.insertBefore(card,chassis?.nextElementSibling||null);
     }
-    return true;
+
+    document.getElementById("tpmsLoginButton")?.addEventListener("click",()=>{
+      const u=document.getElementById("tpmsUsername").value.trim();
+      const p=document.getElementById("tpmsPassword").value;
+
+      if(!u||!p){
+        alert("Enter your TPMS username and password first.");
+        return;
+      }
+
+      sessionStorage.setItem("eod_tpms_unlocked","1");
+      document.getElementById("tpmsLoginArea").style.display="none";
+      document.getElementById("tpmsUnlockedArea").classList.add("show");
+
+      const badge=document.getElementById("tpmsBadge");
+      badge.textContent="UNLOCKED";
+      badge.classList.add("unlocked");
+    });
+
+    document.getElementById("tpmsOpenCloud")?.addEventListener("click",()=>
+      window.open(GOODYEAR_TPMS_URL,"_blank","noopener,noreferrer")
+    );
+
+    document.getElementById("tpmsLockButton")?.addEventListener("click",()=>{
+      sessionStorage.removeItem("eod_tpms_unlocked");
+      document.getElementById("tpmsUnlockedArea").classList.remove("show");
+      document.getElementById("tpmsLoginArea").style.display="block";
+      document.getElementById("tpmsUsername").value="";
+      document.getElementById("tpmsPassword").value="";
+
+      const badge=document.getElementById("tpmsBadge");
+      badge.textContent="LOCKED";
+      badge.classList.remove("unlocked");
+    });
+
+    if(sessionStorage.getItem("eod_tpms_unlocked")==="1"){
+      document.getElementById("tpmsLoginArea").style.display="none";
+      document.getElementById("tpmsUnlockedArea").classList.add("show");
+      document.getElementById("tpmsBadge").textContent="UNLOCKED";
+      document.getElementById("tpmsBadge").classList.add("unlocked");
+    }
   }
 
-  function syncChassis(){
-    const prefix=document.getElementById("prefix");
-    const number=document.getElementById("number");
-    const out=document.getElementById("tpmsStage1Chassis");
-    if(!out)return;
-    const p=prefix?.value||"";
-    const n=(number?.value||"").trim();
-    out.textContent=p&&/^\\d{6}$/.test(n)?p+n:"Enter a chassis in the Chassis section below.";
+  function installTpmsPrompt(){
+    const btn=document.getElementById("addInspection");
+    if(!btn||btn.dataset.tpmsGuardInstalled)return;
+
+    btn.dataset.tpmsGuardInstalled="1";
+    let allowOnce=false;
+
+    const modal=document.createElement("div");
+    modal.className="eod-tpms-modal";
+    modal.id="eodTpmsPrompt";
+
+    modal.innerHTML=`
+      <div class="eod-tpms-dialog" role="dialog" aria-modal="true">
+        <div class="eod-tpms-dialog-head">TPMS CHECK REQUIRED</div>
+        <div class="eod-tpms-dialog-body">
+          <p>Before adding this chassis inspection, confirm that the TPMS information has been checked for this chassis.</p>
+          <div class="eod-tpms-warning">No TPMS information will be submitted or changed automatically. This is only a confirmation step.</div>
+          <div class="eod-tpms-dialog-actions">
+            <button class="eod-tpms-cancel" id="tpmsPromptCancel">NOT YET</button>
+            <button class="eod-tpms-confirm" id="tpmsPromptConfirm">YES — TPMS CHECKED</button>
+          </div>
+        </div>
+      </div>`;
+
+    document.body.appendChild(modal);
+
+    const close=()=>modal.classList.remove("show");
+
+    modal.querySelector("#tpmsPromptCancel").addEventListener("click",close);
+
+    modal.querySelector("#tpmsPromptConfirm").addEventListener("click",()=>{
+      allowOnce=true;
+      close();
+      btn.click();
+    });
+
+    btn.addEventListener("click",e=>{
+      if(allowOnce){
+        allowOnce=false;
+        return;
+      }
+
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      modal.classList.add("show");
+    },true);
   }
 
-  function wire(){
+  function init(){
     ensureStyles();
-    if(!groupEquipment())return false;
-    if(!document.getElementById(TPMS_ID)){
-      const card=buildTpmsCard();
-      const app=document.querySelector("main.app");
-      const equipment=document.getElementById(EQUIPMENT_ID);
-      app.insertBefore(card,equipment||null);
-    }
-    placeTpms();
-    document.getElementById("prefix")?.addEventListener("change",syncChassis);
-    document.getElementById("number")?.addEventListener("input",syncChassis);
-    document.getElementById("tpmsStage1Check")?.addEventListener("click",()=>{
-      const status=document.getElementById("tpmsStage1Status");
-      if(status)status.textContent="Stage 1 layout only — Mobility Cloud connection not active yet.";
-    });
-    document.getElementById("tpmsStage1Screenshot")?.addEventListener("click",()=>{
-      alert("TPMS screenshot generation will be enabled after the Mobility Cloud data connection is implemented.");
-    });
-    syncChassis();
-    return true;
+    removeOldStaticTpms();
+    makeTpmsCard();
+    installTpmsPrompt();
   }
 
-  const timer=setInterval(()=>{if(wire())clearInterval(timer)},100);
-  setTimeout(()=>clearInterval(timer),30000);
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",init,{once:true});
+  }else{
+    init();
+  }
 })();

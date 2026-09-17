@@ -11,8 +11,47 @@
     const style=document.createElement("style");
     style.id=STYLE_ID;
     style.textContent=`
-      /* TPMS enhancement owns only the TPMS card. It does not rearrange the EOD grid. */
-      .eod-tpms-card{grid-area:tpms!important}
+      /* =========================================================
+         EOD WIRE LAYOUT
+         Row 1: Terminal | Chassis
+         Row 2: Tire Audits | Chassis
+         Rows 3-5: TPMS | TPMS
+         Row 6: Containers | Chassis Racks
+         Row 7: Comments / Notes
+         Row 8: Inspection List
+         Row 9: Preview
+         ========================================================= */
+      main.app{
+        width:min(1000px,100%)!important;
+        margin:auto!important;
+        display:grid!important;
+        grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;
+        grid-template-areas:
+          "terminal chassis"
+          "tires chassis"
+          "tpms tpms"
+          "tpms tpms"
+          "tpms tpms"
+          "containers racks"
+          "notes notes"
+          "list list"
+          "preview preview";
+        gap:16px!important;
+        padding-bottom:40px!important;
+      }
+
+      main.app>.sidebar-stack{display:contents!important}
+      main.app>.sidebar-stack>section:nth-child(1){grid-area:terminal!important}
+      main.app>.sidebar-stack>section:nth-child(2){grid-area:tires!important}
+
+      main.app>.eod-layout-chassis{grid-area:chassis!important}
+      main.app>.eod-tpms-card{grid-area:tpms!important}
+      main.app>.eod-layout-containers{grid-area:containers!important}
+      main.app>.eod-layout-racks{grid-area:racks!important}
+      main.app>.eod-layout-notes{grid-area:notes!important}
+      main.app>.eod-layout-list{grid-area:list!important}
+      main.app>#previewCard{grid-area:preview!important}
+
       .eod-tpms-card .card-header-styled{display:flex;align-items:center;justify-content:space-between}
       .eod-tpms-badge{font-size:.68rem;font-weight:900;letter-spacing:.6px;padding:5px 8px;border-radius:999px;background:#334155;color:#fff}
       .eod-tpms-badge.unlocked{background:#198754}
@@ -36,7 +75,21 @@
       .eod-tpms-cancel{background:#e2e8f0!important;color:#1e293b!important}
       .eod-tpms-confirm{background:#198754!important;color:#fff!important}
       .eod-tpms-warning{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;padding:9px 11px;border-radius:8px;font-size:.78rem;font-weight:700;margin-top:10px}
+
       @media(max-width:768px){
+        main.app{
+          grid-template-columns:1fr!important;
+          grid-template-areas:
+            "terminal"
+            "tires"
+            "chassis"
+            "tpms"
+            "containers"
+            "racks"
+            "notes"
+            "list"
+            "preview";
+        }
         .eod-tpms-grid{grid-template-columns:1fr}
         .eod-tpms-actions{flex-direction:column;align-items:stretch}
         .eod-tpms-actions button{width:100%}
@@ -46,10 +99,32 @@
   }
 
   function removeOldStaticTpms(){
-    /* The index previously contained a static Detailed Tire and Gateway Status card.
-       That card occupied the same grid area as the login card and caused the GUI to
-       appear overridden/duplicated. The TPMS enhancement is now the single TPMS card. */
+    /* The old hard-coded TPMS display in index.html is not live TPMS data.
+       Remove it so the login-gated TPMS card is the single TPMS section. */
     document.querySelectorAll("main.app .tpms-section").forEach(el=>el.remove());
+  }
+
+  function findCardByTitle(title){
+    return [...document.querySelectorAll("main.app>section.card")].find(section=>
+      section.querySelector("h2")?.textContent.trim().toLowerCase()===title.toLowerCase()
+    );
+  }
+
+  function applyWireLayout(){
+    const app=document.querySelector("main.app");
+    if(!app)return;
+
+    const chassis=document.getElementById("addInspection")?.closest("section.card");
+    const containers=findCardByTitle("Containers");
+    const racks=findCardByTitle("Chassis Racks");
+    const notes=findCardByTitle("Comments / Notes")||findCardByTitle("Notes");
+    const list=findCardByTitle("Inspection List");
+
+    chassis?.classList.add("eod-layout-chassis");
+    containers?.classList.add("eod-layout-containers");
+    racks?.classList.add("eod-layout-racks");
+    notes?.classList.add("eod-layout-notes");
+    list?.classList.add("eod-layout-list");
   }
 
   function makeTpmsCard(){
@@ -193,6 +268,7 @@
     ensureStyles();
     removeOldStaticTpms();
     makeTpmsCard();
+    applyWireLayout();
     installTpmsPrompt();
   }
 

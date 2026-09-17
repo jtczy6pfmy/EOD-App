@@ -7,6 +7,7 @@
     const mark=()=>{
       if(status.classList.contains("ok")&&window.EODTPMS?.chassis){
         btn.dataset.tpmsVerifiedFor=window.EODTPMS.chassis;
+        btn.dataset.tpmsBypass="1";
         btn.title="TPMS verified. Click ADD INSPECTION to continue.";
       }
     };

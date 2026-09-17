@@ -1,0 +1,45 @@
+name: Activate TPMS Stage 1
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  activate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Activate staged TPMS layout
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          text = p.read_text(encoding='utf-8')
+          marker = '<script src="./tpms-stage1.js"></script>'
+          if marker not in text:
+              text = text.replace('</body>', f'{marker}\n</body>', 1)
+              p.write_text(text, encoding='utf-8')
+              print('TPMS Stage 1 activated.')
+          else:
+              print('TPMS Stage 1 already active.')
+          PY
+
+      - name: Commit activation and remove one-time workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git rm .github/workflows/activate-tpms-stage1.yml
+          if git diff --cached --quiet; then
+            echo "Nothing to commit."
+          else
+            git commit -m "Activate TPMS Stage 1 layout"
+            git push
+          fi

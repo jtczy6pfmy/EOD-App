@@ -60,8 +60,6 @@
 
       if(after!==before && cloud && !sessionStorage.getItem("eod_recovered_once")){
         sessionStorage.setItem("eod_recovered_once","1");
-        // The page has already initialized by the time this runs. Reload once
-        // so index.html reads the recovered daily record and renders it.
         window.location.reload();
         return;
       }
@@ -89,13 +87,19 @@
   window.addEventListener("pagehide",()=>{const s=readLocal();if(s)upload(s).catch(()=>{})});
   window.EODCloud={syncNow:recoverAndSync,backupCurrentState:recoverAndSync};
 
-  // Critical startup fix: wait until the HTML controls exist before querying
-  // Supabase. Previously the recovery request could run while #terminal was
-  // not yet in the document, making startup timing-dependent on iOS Safari.
   const start=()=>{
     setTimeout(recoverAndSync,100);
     setInterval(recoverAndSync,5000);
   };
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start,{once:true});
   else start();
+
+  const loadEnhancements=()=>{
+    ["./tpms-enhancement.js","./tpms-flow-fix.js"].forEach(src=>{
+      if(document.querySelector(`script[src="${src}"]`))return;
+      const s=document.createElement("script");s.src=src;s.defer=true;document.head.appendChild(s);
+    });
+  };
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",loadEnhancements,{once:true});
+  else loadEnhancements();
 })();

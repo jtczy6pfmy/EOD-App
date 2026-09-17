@@ -52,6 +52,14 @@
       main.app>.eod-layout-list{grid-area:list!important}
       main.app>#previewCard{grid-area:preview!important}
 
+      .eod-chassis-tpms-wrap{display:flex;flex-direction:column;gap:8px;margin-top:2px}
+      .eod-chassis-tpms-check{display:flex;align-items:center;gap:9px;margin:0;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;background:#f8fafc;font-weight:800;color:#1e293b;cursor:pointer}
+      .eod-chassis-tpms-check input{width:18px;height:18px;margin:0;accent-color:#198754;cursor:pointer}
+      .eod-chassis-tpms-button{margin-top:0!important}
+      .eod-chassis-tpms-button:disabled{opacity:.55;cursor:not-allowed}
+      .eod-chassis-tpms-status{display:none;padding:8px 10px;border-radius:8px;background:#ecfdf3;color:#166534;border:1px solid #bbf7d0;font-size:.78rem;font-weight:800}
+      .eod-chassis-tpms-status.show{display:block}
+
       .eod-tpms-card .card-header-styled{display:flex;align-items:center;justify-content:space-between}
       .eod-tpms-badge{font-size:.68rem;font-weight:900;letter-spacing:.6px;padding:5px 8px;border-radius:999px;background:#334155;color:#fff}
       .eod-tpms-badge.unlocked{background:#198754}
@@ -99,8 +107,6 @@
   }
 
   function removeOldStaticTpms(){
-    /* The old hard-coded TPMS display in index.html is not live TPMS data.
-       Remove it so the login-gated TPMS card is the single TPMS section. */
     document.querySelectorAll("main.app .tpms-section").forEach(el=>el.remove());
   }
 
@@ -125,6 +131,68 @@
     racks?.classList.add("eod-layout-racks");
     notes?.classList.add("eod-layout-notes");
     list?.classList.add("eod-layout-list");
+  }
+
+  function chassisTpmsKey(){
+    const prefix=document.getElementById("prefix")?.value||"";
+    const number=document.getElementById("number")?.value.trim()||"";
+    return `eod_tpms_cloud_checked_${prefix}_${number}`;
+  }
+
+  function addChassisTpmsControls(){
+    const chassis=document.getElementById("addInspection")?.closest("section.card");
+    const addButton=document.getElementById("addInspection");
+    if(!chassis||!addButton||chassis.querySelector("#chassisHasTpms"))return;
+
+    const wrap=document.createElement("div");
+    wrap.className="eod-chassis-tpms-wrap";
+    wrap.innerHTML=`
+      <label class="eod-chassis-tpms-check">
+        <input type="checkbox" id="chassisHasTpms">
+        <span>Chassis has TPMS installed</span>
+      </label>
+      <button type="button" id="checkTpmsCloud" class="secondary eod-chassis-tpms-button" disabled>CHECK TPMS CLOUD</button>
+      <div id="chassisTpmsStatus" class="eod-chassis-tpms-status"></div>`;
+
+    addButton.parentElement?.insertBefore(wrap,addButton);
+
+    const checkbox=document.getElementById("chassisHasTpms");
+    const cloudButton=document.getElementById("checkTpmsCloud");
+    const status=document.getElementById("chassisTpmsStatus");
+
+    const refresh=()=>{
+      const installed=checkbox.checked;
+      const checked=installed&&sessionStorage.getItem(chassisTpmsKey())==="1";
+      cloudButton.disabled=!installed;
+      if(checked){
+        status.textContent="✓ TPMS cloud checked for this chassis.";
+        status.classList.add("show");
+      }else{
+        status.textContent="";
+        status.classList.remove("show");
+      }
+    };
+
+    checkbox.addEventListener("change",()=>{
+      if(!checkbox.checked){
+        sessionStorage.removeItem(chassisTpmsKey());
+      }
+      refresh();
+    });
+
+    cloudButton.addEventListener("click",()=>{
+      if(!checkbox.checked)return;
+      sessionStorage.setItem(chassisTpmsKey(),"1");
+      status.textContent="✓ TPMS cloud opened. Complete the TPMS check, then return here to add the inspection.";
+      status.classList.add("show");
+      window.open(GOODYEAR_TPMS_URL,"_blank","noopener,noreferrer");
+    });
+
+    const prefix=document.getElementById("prefix");
+    const number=document.getElementById("number");
+    prefix?.addEventListener("change",refresh);
+    number?.addEventListener("input",refresh);
+    refresh();
   }
 
   function makeTpmsCard(){
@@ -231,7 +299,7 @@
       <div class="eod-tpms-dialog" role="dialog" aria-modal="true">
         <div class="eod-tpms-dialog-head">TPMS CHECK REQUIRED</div>
         <div class="eod-tpms-dialog-body">
-          <p>Before adding this chassis inspection, confirm that the TPMS information has been checked for this chassis.</p>
+          <p id="tpmsPromptText">Before adding this chassis inspection, confirm that the TPMS information has been checked for this chassis.</p>
           <div class="eod-tpms-warning">No TPMS information will be submitted or changed automatically. This is only a confirmation step.</div>
           <div class="eod-tpms-dialog-actions">
             <button class="eod-tpms-cancel" id="tpmsPromptCancel">NOT YET</button>
@@ -253,14 +321,24 @@
     });
 
     btn.addEventListener("click",e=>{
-      if(allowOnce){
-        allowOnce=false;
+      const installed=document.getElementById("chassisHasTpms")?.checked===true;
+      if(!installed)return;
+
+      if(!allowOnce){
+        e.preventDefault();
+        e.stopImmediatePropagation();
+
+        const checked=sessionStorage.getItem(chassisTpmsKey())==="1";
+        if(!checked){
+          alert("Please click CHECK TPMS CLOUD and complete the TPMS check before adding this inspection.");
+          return;
+        }
+
+        modal.classList.add("show");
         return;
       }
 
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      modal.classList.add("show");
+      allowOnce=false;
     },true);
   }
 
@@ -269,6 +347,7 @@
     removeOldStaticTpms();
     makeTpmsCard();
     applyWireLayout();
+    addChassisTpmsControls();
     installTpmsPrompt();
   }
 

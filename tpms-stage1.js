@@ -5,6 +5,17 @@
   const STYLE_ID="eod-tpms-stage1-style";
   const TPMS_ID="eodTpmsCard";
 
+  function openGoodyearCloud(){
+    const link=document.createElement("a");
+    link.href=GOODYEAR_TPMS_URL;
+    link.target="_blank";
+    link.rel="noopener noreferrer";
+    link.style.display="none";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }
+
   function ensureStyles(){
     if(document.getElementById(STYLE_ID))return;
 
@@ -185,7 +196,7 @@
       sessionStorage.setItem(chassisTpmsKey(),"1");
       status.textContent="✓ TPMS cloud opened. Complete the TPMS check, then return here to add the inspection.";
       status.classList.add("show");
-      window.open(GOODYEAR_TPMS_URL,"_blank","noopener,noreferrer");
+      openGoodyearCloud();
     });
 
     const prefix=document.getElementById("prefix");
@@ -261,7 +272,7 @@
     });
 
     document.getElementById("tpmsOpenCloud")?.addEventListener("click",()=>
-      window.open(GOODYEAR_TPMS_URL,"_blank","noopener,noreferrer")
+      openGoodyearCloud()
     );
 
     document.getElementById("tpmsLockButton")?.addEventListener("click",()=>{

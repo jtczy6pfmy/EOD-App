@@ -1,6 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>
+// Clear any legacy EOD service worker/cache so GitHub Pages always serves the current app.
+if("serviceWorker" in navigator){
+  navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(reg=>reg.unregister())).catch(()=>{});
+}
+if("caches" in window){caches.keys().then(keys=>keys.forEach(k=>caches.delete(k))).catch(()=>{});}
+</script>
 
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">

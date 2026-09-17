@@ -17,7 +17,7 @@
   `;
   const style=document.createElement("style");style.textContent=css;document.head.appendChild(style);
 
-  function findCard(title){return [...document.querySelectorAll("main.app > section.card")].find(x=>x.querySelector("h2")?.textContent.trim().toLowerCase()===title.toLowerCase())}
+  function findCard(title){return [...document.querySelectorAll("main.app section.card")].find(x=>x.querySelector("h2")?.textContent.trim().toLowerCase()===title.toLowerCase())}
   function moveLayout(){
     const app=document.querySelector("main.app");if(!app||app.dataset.tpmsLayout)return;
     const chassis=findCard("Chassis"),containers=findCard("Containers"),racks=findCard("Chassis Racks");
@@ -32,7 +32,8 @@
     const chassis=findCard("Chassis");if(!chassis)return;
     const row=document.createElement("div");row.className="eod-layout-row eod-tpms-row";
     row.innerHTML=`<section class="tpms-card" id="tpmsCard"><div class="tpms-head"><h2>TPMS — Goodyear Mobility Cloud</h2><span class="tpms-badge" id="tpmsBadge">NOT CHECKED</span></div><div class="tpms-body"><div class="tpms-status" id="tpmsStatus">TPMS verification is required before a chassis inspection can be added.</div><div class="tpms-actions"><button id="tpmsLogin">OPEN GOODYEAR MOBILITY CLOUD</button><button id="tpmsRefresh" class="secondary">CHECK TPMS</button><button id="tpmsScreenshot" class="secondary" disabled>CREATE TPMS SCREENSHOT</button></div><div id="tpmsData" class="tpms-hidden"><div class="tpms-grid"><div class="tpms-metric"><small>Chassis</small><strong id="tpmsChassis">—</strong></div><div class="tpms-metric"><small>Pressure</small><strong id="tpmsPressure">—</strong></div><div class="tpms-metric"><small>Temperature</small><strong id="tpmsTemperature">—</strong></div><div class="tpms-metric"><small>Status</small><strong id="tpmsHealth">—</strong></div></div><div id="tpmsDefects" class="tpms-defects tpms-hidden"></div><div class="tpms-screenshot" id="tpmsSnapshotText"></div></div></div></section>`;
-    app.insertBefore(row,chassis);
+    const anchor=app.querySelector(".eod-equipment-row")||chassis;
+    app.insertBefore(row,anchor);
     document.getElementById("tpmsLogin").onclick=()=>window.open(GOODYEAR_URL,"_blank","noopener,noreferrer");
     document.getElementById("tpmsRefresh").onclick=checkTPMS;
     document.getElementById("tpmsScreenshot").onclick=createScreenshot;
@@ -61,7 +62,6 @@
       const payload=await r.json();
       renderTPMS(chassis,payload);pending=null;document.getElementById("tpmsBadge").textContent="VERIFIED";setStatus(`TPMS data retrieved for ${chassis}. Review it before adding the inspection.`,"ok");
       document.getElementById("tpmsScreenshot").disabled=false;
-      if(fromPrompt)document.getElementById("tpmsYes").disabled=false;
       return true;
     }catch(e){
       document.getElementById("tpmsBadge").textContent="ACTION REQUIRED";

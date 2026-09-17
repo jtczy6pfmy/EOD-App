@@ -3,7 +3,7 @@
   const SOURCE="https://raw.githubusercontent.com/jtczy6pfmy/EOD-App/802834bbbdcf60bdf4e88772e9d20b4d047b16af/tpms-stage1.js";
   fetch(SOURCE).then(r=>r.text()).then(src=>{
     const oldUrl="https://tiretrac.ap.goodyear.com/WebApp/Membership/Login.aspx?ReturnUrl=%2F";
-    const newUrl="https://goodyearmobilitycloud.com";
+    const newUrl="https://keycloak.goodyearmobilitycloud.com/realms/naps/protocol/openid-connect/auth?client_id=frontend-client-gmc&redirect_uri=https%3A%2F%2Fwww.goodyearmobilitycloud.com%2Fauth%2Fcallback&state=4fb6335c-7f24-404b-98ae-8a770c543a91&response_mode=fragment&response_type=code&scope=openid&nonce=0b99e527-6dff-49a5-8ea4-e68b099d727e&ui_locales=en-US&code_challenge=4MXgDo6jJJV23l-sptRKF-XgY5ZVB_R4wRVX2rGowhY&code_challenge_method=S256";
     if(!src.includes(oldUrl)) throw new Error("TPMS source URL not found");
     src=src.replaceAll(oldUrl,newUrl);
 

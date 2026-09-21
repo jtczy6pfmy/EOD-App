@@ -1,176 +1,117 @@
 (() => {
-"use strict";
+  "use strict";
 
-const isHarrisburg = window.location.pathname.includes("harrisburg") || 
-                     (typeof CURRENT_LOCATION !== "undefined" && CURRENT_LOCATION === "harrisburg") ||
-                     (localStorage.getItem("eod_location") === "harrisburg");
+  const HARRISBURG_MILESTONES = {
+    8:  { icon: "🎯", title: "25% COMPLETE!", subtitle: "8 / 30 INSPECTIONS", color: "#22B7F0", highlight: "#A8EEFF" },
+    15: { icon: "👽", title: "50% COMPLETE!", subtitle: "15 / 30 INSPECTIONS", color: "#65D64A", highlight: "#C8FFB8" },
+    23: { icon: "⚡", title: "75% COMPLETE!", subtitle: "23 / 30 INSPECTIONS", color: "#FF7A35", highlight: "#FFD0A8" },
+    30: { icon: "🏆", title: "DAILY TARGET COMPLETE!", subtitle: "30 / 30 INSPECTIONS", color: "#F04B32", highlight: "#FFB0A5" }
+  };
 
-const TARGET = isHarrisburg ? 30 : 28;
+  const STANDARD_MILESTONES = {
+    7:  { icon: "🎯", title: "25% COMPLETE!", subtitle: "7 / 28 INSPECTIONS", color: "#22B7F0", highlight: "#A8EEFF" },
+    14: { icon: "👽", title: "50% COMPLETE!", subtitle: "14 / 28 INSPECTIONS", color: "#65D64A", highlight: "#C8FFB8" },
+    21: { icon: "⚡", title: "75% COMPLETE!", subtitle: "21 / 28 INSPECTIONS", color: "#FF7A35", highlight: "#FFD0A8" },
+    28: { icon: "🏆", title: "DAILY TARGET COMPLETE!", subtitle: "28 / 28 INSPECTIONS", color: "#F04B32", highlight: "#FFB0A5" }
+  };
 
-const MILESTONES = isHarrisburg ? {
-  8: { icon: "🎯", title: "25% COMPLETE!", subtitle: "8 / 30 INSPECTIONS", color: "#22B7F0", highlight: "#A8EEFF" },
-  15:  { icon: "👽", title: "50% COMPLETE!", subtitle: "15 / 30 INSPECTIONS", color: "#65D64A", highlight: "#C8FFB8" },
-  23:{ icon: "⚡", title: "75% COMPLETE!", subtitle: "23 / 30 INSPECTIONS", color: "#FF7A35", highlight: "#FFD0A8" },
-  30:  { icon: "🏆", title: "DAILY TARGET COMPLETE!", subtitle: "30 / 30 INSPECTIONS", color: "#F04B32", highlight: "#FFB0A5" }
-} : {
-  7:   { icon: "🎯", title: "25% COMPLETE!", subtitle: "7 / 28 INSPECTIONS", color: "#22B7F0", highlight: "#A8EEFF" },
-  14:  { icon: "👽", title: "50% COMPLETE!", subtitle: "14 / 28 INSPECTIONS", color: "#65D64A", highlight: "#C8FFB8" },
-  21:  { icon: "⚡", title: "75% COMPLETE!", subtitle: "21 / 28 INSPECTIONS", color: "#FF7A35", highlight: "#FFD0A8" },
-  28:  { icon: "🏆", title: "DAILY TARGET COMPLETE!", subtitle: "28 / 28 INSPECTIONS", color: "#F04B32", highlight: "#FFB0A5" }
-};
+  function isHarrisburg() {
+    const terminal = document.getElementById("terminal");
+    return terminal && terminal.value === "HARRISBURG";
+  }
 
-let lastTotal=null;
-let showing=false;
-let styleInjected=false;
-let savedTerminalNodes=null;
+  function getMilestones() {
+    return isHarrisburg() ? HARRISBURG_MILESTONES : STANDARD_MILESTONES;
+  }
 
-function injectStyles(){
-  if(styleInjected)return;
-  styleInjected=true;
-  const style=document.createElement("style");
-  style.textContent=`
-    .fill.milestone-pulse{
-      position:relative;
-      overflow:hidden;
-      background-image:linear-gradient(
-        110deg,
-        var(--milestone-color,#ffc107) 0%,
-        var(--milestone-color,#ffc107) 38%,
-        var(--milestone-highlight,#ffe47a) 49%,
-        var(--milestone-highlight,#ffe47a) 51%,
-        var(--milestone-color,#ffc107) 62%,
-        var(--milestone-color,#ffc107) 100%
-      );
-      background-size:220% 100%;
-      animation:eodBarHighlight 2.4s linear infinite;
-      box-shadow:0 0 8px var(--milestone-glow,#ffc107);
+  function getTarget() {
+    return isHarrisburg() ? 30 : 28;
+  }
+
+  let lastTotal = null;
+  let showing = false;
+  let savedTerminalNodes = null;
+
+  function getColor(total) {
+    const milestones = getMilestones();
+    for (const mark of Object.keys(milestones).map(Number).sort((a, b) => b - a)) {
+      if (total >= mark) return milestones[mark].color;
+    }
+    return "#ffc107";
+  }
+
+  function getHighlight(total) {
+    const milestones = getMilestones();
+    for (const mark of Object.keys(milestones).map(Number).sort((a, b) => b - a)) {
+      if (total >= mark) return milestones[mark].highlight;
+    }
+    return "#FFE47A";
+  }
+
+  function showInTerminal(milestone) {
+    if (showing) return;
+    const terminal = document.getElementById("terminal");
+    const body = terminal?.closest(".card")?.querySelector(".card-body");
+    if (!body) return;
+
+    showing = true;
+    savedTerminalNodes = Array.from(body.childNodes);
+    const panel = document.createElement("div");
+    panel.className = "eod-milestone";
+    panel.style.cssText = `min-height:168px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;border-radius:10px;color:#fff;background:linear-gradient(135deg,${milestone.color},#101827 55%,#05070D);`;
+    panel.innerHTML = `<div style="font-size:3.6rem;line-height:1;margin-bottom:8px">${milestone.icon}</div><div style="font-size:1.45rem;font-weight:900;letter-spacing:.7px">${milestone.title}</div><div style="margin-top:6px;font-size:.9rem;font-weight:800;letter-spacing:.8px">${milestone.subtitle}</div>`;
+    body.replaceChildren(panel);
+
+    setTimeout(() => {
+      if (savedTerminalNodes) body.replaceChildren(...savedTerminalNodes);
+      savedTerminalNodes = null;
+      showing = false;
+    }, 2800);
+  }
+
+  function update(total, initial = false) {
+    const count = Number(total) || 0;
+    const milestones = getMilestones();
+    const fill = document.getElementById("fill");
+
+    if (fill) {
+      const color = getColor(count);
+      fill.style.backgroundColor = color;
+      fill.style.setProperty("--milestone-color", color);
+      fill.style.setProperty("--milestone-highlight", getHighlight(count));
     }
 
-    @keyframes eodBarHighlight{
-      from{background-position:200% 0}
-      to{background-position:-20% 0}
+    if (initial) {
+      const reached = Object.keys(milestones).map(Number).filter(mark => count >= mark).sort((a, b) => b - a)[0];
+      if (reached) showInTerminal(milestones[reached]);
+    } else if (milestones[count] && count !== lastTotal) {
+      showInTerminal(milestones[count]);
+    }
+    lastTotal = count;
+  }
+
+  function watchCount() {
+    const count = document.getElementById("count");
+    const terminal = document.getElementById("terminal");
+    if (!count || !terminal) {
+      requestAnimationFrame(watchCount);
+      return;
     }
 
-    .eod-milestone{
-      min-height:168px;display:flex;flex-direction:column;align-items:center;
-      justify-content:center;text-align:center;border-radius:10px;color:#fff;
-      animation:eodMilestoneIn .35s ease-out;
-      box-shadow:inset 0 0 0 2px rgba(255,255,255,.2),0 0 18px rgba(34,183,240,.18)
-    }
-    .eod-milestone-icon{font-size:3.6rem;line-height:1;margin-bottom:8px;animation:eodIconBounce .8s ease-in-out infinite alternate}
-    .eod-milestone-title{font-size:1.45rem;font-weight:900;letter-spacing:.7px}
-    .eod-milestone-subtitle{margin-top:6px;font-size:.9rem;font-weight:800;letter-spacing:.8px;opacity:.95}
-    @keyframes eodMilestoneIn{from{opacity:0;transform:scale(.88)}to{opacity:1;transform:scale(1)}}
-    @keyframes eodIconBounce{from{transform:translateY(0) scale(1)}to{transform:translateY(-7px) scale(1.08)}}
-  `;
-  document.head.appendChild(style);
-}
-
-function getColor(total){
-  const marks = Object.keys(MILESTONES).map(Number).sort((a, b) => b - a);
-  for (const mark of marks) {
-    if (total >= mark) return MILESTONES[mark].color;
-  }
-  return "#ffc107";
-}
-
-function getHighlight(total){
-  const marks = Object.keys(MILESTONES).map(Number).sort((a, b) => b - a);
-  for (const mark of marks) {
-    if (total >= mark) return MILESTONES[mark].highlight;
-  }
-  return "#FFE47A";
-}
-
-function highestReached(total){
-  const marks = Object.keys(MILESTONES).map(Number);
-  return marks.filter(mark => total >= mark).pop() || 0;
-}
-
-function showInTerminal(m){
-  if(showing)return;
-  const terminal=document.getElementById("terminal");
-  const body=terminal?.closest(".card")?.querySelector(".card-body");
-  if(!body)return;
-
-  showing=true;
-  savedTerminalNodes=Array.from(body.childNodes);
-
-  const panel=document.createElement("div");
-  panel.className="eod-milestone";
-  panel.style.background=`linear-gradient(135deg,${m.color},#101827 55%,#05070D)`;
-  panel.innerHTML=
-    `<div class="eod-milestone-icon">${m.icon}</div>`+
-    `<div class="eod-milestone-title">${m.title}</div>`+
-    `<div class="eod-milestone-subtitle">${m.subtitle}</div>`;
-  body.replaceChildren(panel);
-
-  setTimeout(()=>{
-    if(savedTerminalNodes)body.replaceChildren(...savedTerminalNodes);
-    savedTerminalNodes=null;
-    showing=false;
-  },2800);
-}
-
-function update(total,initial=false){
-  injectStyles();
-  const count=Number(total)||0;
-  const fill=document.getElementById("fill");
-
-  if(fill){
-    const color=getColor(count);
-    const highlight=getHighlight(count);
-    fill.style.setProperty("--milestone-color",color);
-    fill.style.setProperty("--milestone-highlight",highlight);
-    fill.style.setProperty("--milestone-glow",color);
-    fill.style.backgroundColor=color;
-    fill.classList.add("milestone-pulse");
+    const refresh = () => update(Number.parseInt(count.textContent, 10) || 0, true);
+    refresh();
+    new MutationObserver(() => update(Number.parseInt(count.textContent, 10) || 0, false)).observe(count, { childList: true, characterData: true, subtree: true });
+    terminal.addEventListener("change", () => {
+      lastTotal = null;
+      update(Number.parseInt(count.textContent, 10) || 0, true);
+    });
   }
 
-  if(initial){
-    const reached=highestReached(count);
-    if(reached)showInTerminal(MILESTONES[reached]);
-  }else if(MILESTONES[count]&&count!==lastTotal){
-    showInTerminal(MILESTONES[count]);
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", watchCount, { once: true });
+  } else {
+    watchCount();
   }
 
-  lastTotal=count;
-}
-
-function wireEnterToButton(inputId,buttonId){
-  const input=document.getElementById(inputId);
-  const button=document.getElementById(buttonId);
-  if(!input||!button)return;
-  input.addEventListener("keydown",event=>{
-    if(event.key!=="Enter")return;
-    event.preventDefault();
-    button.click();
-  });
-}
-
-function wireInspectionEnter(){
-  wireEnterToButton("number","addInspection");
-  wireEnterToButton("equipmentNote","addInspection");
-  wireEnterToButton("containerNumber","addContainerInspection");
-  wireEnterToButton("containerNote","addContainerInspection");
-  wireEnterToButton("rackNumber","addRackInspection");
-  wireEnterToButton("rackNote","addRackInspection");
-  wireEnterToButton("tireAuditTotal","addTireAudits");
-}
-
-function watchCount(){
-  const count=document.getElementById("count");
-  if(!count){requestAnimationFrame(watchCount);return}
-  update(Number.parseInt(count.textContent,10)||0,true);
-  new MutationObserver(()=>update(Number.parseInt(count.textContent,10)||0,false)).observe(count,{childList:true,characterData:true,subtree:true});
-  wireInspectionEnter();
-}
-
-if(document.readyState==="loading"){
-  document.addEventListener("DOMContentLoaded",watchCount,{once:true});
-}else{
-  watchCount();
-}
-
-window.EODMilestones={update,getColor,getHighlight,TARGET};
+  window.EODMilestones = { update, getColor, getHighlight, getTarget, TARGET: getTarget };
 })();

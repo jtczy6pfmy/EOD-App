@@ -60,7 +60,7 @@ function saveTerminalPreference(){if(terminal.value)localStorage.setItem(TERMINA
 function load(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY))}catch(e){return null}}
 function loadTerminalPreference(){try{return localStorage.getItem(TERMINAL_KEY)||""}catch(e){return ""}}
 function performHardReset(){localStorage.removeItem(STORAGE_KEY);sessionStorage.removeItem("instance_id");window.location.reload()}
-function updatePrefixes(forceReset=false){const values=SPECIAL.includes(terminal.value)?[...BASE,...EXTRA]:BASE,current=prefix.value;prefix.innerHTML="";values.forEach(p=>{const o=document.createElement("option");o.value=p;o.textContent=p;prefix.appendChild(o)});prefix.value=!forceReset&&values.includes(current)?current:values[0]}
+function updatePrefixes(forceReset=false){const values=terminal.value==="HARRISBURG"?[...BASE,"AIMZ"]:SPECIAL.includes(terminal.value)?[...BASE,...EXTRA]:BASE,current=prefix.value;prefix.innerHTML="";values.forEach(p=>{const o=document.createElement("option");o.value=p;o.textContent=p;prefix.appendChild(o)});prefix.value=!forceReset&&values.includes(current)?current:values[0]}
 function inspectionTotal(){let n=0;["chassis","containers","racks"].forEach(c=>Object.values(data[c]).forEach(t=>Object.values(t).forEach(s=>{if(Array.isArray(s))n+=s.length})));return n}
 function total(){return inspectionTotal()+Math.floor((Number(data.tireAudits)||0)/3)}
 function sectionFor(type){return type==="5652"||type==="5653"?"Pre-repair":type==="5900"?"Post-repair":"Add-on"}

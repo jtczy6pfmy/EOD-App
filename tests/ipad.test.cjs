@@ -122,6 +122,13 @@ let browser,server;
  assert.equal(await page.locator('.inspection-row').count(),1);
  await page.reload();await saved();assert.equal(await page.locator('.inspection-row').count(),1);
  assert.match(await page.locator('.inspection-row').textContent(),/final correction/);
+ const duplicate=copy(legacy);duplicate.terminal='BUFFALO';cloud.set('BUFFALO',duplicate);
+ await page.locator('#terminal').selectOption('BUFFALO');await saved();
+ await page.locator('.inspection-row').filter({hasText:'No Defect'}).locator('button').click();
+ await page.getByRole('button',{name:'Delete inspection',exact:true}).click();await saved();
+ assert.equal(await page.locator('.inspection-row').count(),1);
+ assert.match(await page.locator('.inspection-row').textContent(),/— Defect/);
+ await page.reload();await saved();assert.equal(await page.locator('.inspection-row').count(),1);
  // Storage failure must never be reported as a successful local save.
  await page.evaluate(()=>{Storage.prototype.setItem=()=>{throw new Error('quota exceeded')};});
  await page.locator('#notes').fill('storage failure');

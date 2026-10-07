@@ -70,3 +70,12 @@ test('editing legacy duplicates removes every old error version, including after
  assert.equal(S.flatten(merged.data)[0].number,'NSPZ 654321');
  assert.equal(Object.values(merged._sync.records).filter(r=>r.deleted).length,1);
 });
+test('deleting one legacy duplicate retains the other condition',()=>{
+ const legacy=draft();legacy.data.chassis['5652']['Pre-repair'].push(['NSPZ 133717','Defect',''],['NSPZ 133717','No Defect','']);
+ const old=S.normalize(legacy),d=copy(old);
+ d.data.chassis['5652']['Pre-repair']=d.data.chassis['5652']['Pre-repair'].filter(item=>item[1]==='Defect');
+ const deleted=S.save(old,d,'ipad',200),merged=S.merge(old,deleted);
+ assert.equal(S.flatten(merged.data).length,1);
+ assert.equal(S.flatten(merged.data)[0].condition,'Defect');
+ assert.equal(S.flatten(S.merge(deleted,old).data).length,1);
+});

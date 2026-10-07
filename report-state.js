@@ -14,7 +14,7 @@
     const sources=Object.values(records).filter(record=>!record.replacedBy);
     sources.forEach(source=>Object.entries(records).forEach(([id,candidate])=>{
       if(id===source.id||candidate.deleted)return;
-      const replaced=source.replaces?.includes(identity(candidate))||(source.deleted&&identity(source)===identity(candidate));
+      const replaced=!source.deleted&&source.replaces?.includes(identity(candidate));
       if(replaced&&choose(source,candidate)===source)records[id]={...candidate,deleted:true,updated:source.updated,replacedBy:source.id};
     }));
     return records;

@@ -1,101 +1,135 @@
-/* EOD-App durable backup / recovery.
-   One stable browser key per report day. Supabase is the durable source of truth.
-*/
+/* Durable reports: record corrections, deletion tombstones and conditional writes. */
 (()=>{
   "use strict";
-  const SUPABASE_URL="https://tjhsrydhkigvhlllnstm.supabase.co";
-  const SUPABASE_KEY="sb_publishable_nB2sQ-lTf9mJrmb6UWn4vw_gLlsnYbv";
-  const REST_URL=`${SUPABASE_URL}/rest/v1/eod_daily`;
-  const HEADERS={apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`,"Content-Type":"application/json"};
-  const PREFIX="eodInspectionReport_v13_";
-  const d=new Date();
-  const ISO_TODAY=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
-  const SHARED_INSTANCE=`shared_${ISO_TODAY}`;
-  const SHARED_KEY=PREFIX+SHARED_INSTANCE;
-  try{sessionStorage.setItem("instance_id",SHARED_INSTANCE)}catch(e){}
-
-  let syncing=false,queued=false,retryTimer=null,lastUploadedSignature="";
-  const terminal=()=>document.getElementById("terminal")?.value||"HARRISBURG";
-  const readLocal=()=>{try{const v=localStorage.getItem(SHARED_KEY);return v?JSON.parse(v):null}catch(e){return null}};
-  const writeLocal=state=>{try{localStorage.setItem(SHARED_KEY,JSON.stringify(state));return true}catch(e){return false}};
-  const dateISO=v=>{const m=String(v||"").match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);return m?`20${m[3]}-${String(m[1]).padStart(2,"0")}-${String(m[2]).padStart(2,"0")}`:null};
-
-  function merge(a,b){
-    if(a==null)return b;if(b==null)return a;
-    if(Array.isArray(a)&&Array.isArray(b)){
-      const out=a.slice(),seen=new Set(out.map(x=>JSON.stringify(x)));
-      for(const x of b){const s=JSON.stringify(x);if(!seen.has(s)){seen.add(s);out.push(x)}}
-      return out;
+  const URL="https://tjhsrydhkigvhlllnstm.supabase.co/rest/v1/eod_daily";
+  const KEY="sb_publishable_nB2sQ-lTf9mJrmb6UWn4vw_gLlsnYbv";
+  const HEADERS={apikey:KEY,Authorization:`Bearer ${KEY}`,"Content-Type":"application/json"};
+  const S=window.EODState,client=crypto.randomUUID(),now=new Date();
+  const iso=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
+  const date=`${now.getMonth()+1}/${now.getDate()}/${String(now.getFullYear()).slice(-2)}`;
+  const prefix=`eodInspectionReport_v14_${iso}_`,legacyKey=`eodInspectionReport_v13_shared_${iso}`;
+  let syncing=false,queued=false,timer,activeTerminal="",status={state:"idle",message:"Choose a terminal"};
+  const volatile=new Map(),storageFailed=new Set(),key=terminal=>prefix+encodeURIComponent(terminal);
+  function parse(raw){try{return raw?JSON.parse(raw):null}catch{return null}}
+  function read(terminal){
+    if(!terminal)return null;
+    if(volatile.has(terminal))return volatile.get(terminal);
+    let state;try{state=parse(localStorage.getItem(key(terminal)));}catch{}
+    if(!state){
+      let legacy;try{legacy=parse(localStorage.getItem(legacyKey));}catch{}
+      if(legacy?.terminal===terminal&&legacy.date===date)state=legacy;
     }
-    if(typeof a==="number"&&typeof b==="number")return Math.max(a,b);
-    if(typeof a==="object"&&typeof b==="object"){
-      const out={...a};for(const k of Object.keys(b))out[k]=k in out?merge(out[k],b[k]):b[k];return out;
-    }
-    return b??a;
+    if(!state)return null;
+    state=S.normalize(state);volatile.set(terminal,state);return state;
   }
-  const mergeStates=(cloud,local)=>!cloud?local:!local?cloud:{...merge(cloud,local),terminal:local.terminal||cloud.terminal,date:local.date||cloud.date};
-
-  async function fetchCloud(){
-    const url=`${REST_URL}?report_date=eq.${encodeURIComponent(ISO_TODAY)}&terminal=eq.${encodeURIComponent(terminal())}&select=app_state`;
-    const r=await fetch(url,{headers:HEADERS,cache:"no-store"});
-    if(!r.ok)throw new Error(`Supabase GET ${r.status}`);
-    const rows=await r.json();return rows.length?rows[0].app_state:null;
+  function setStatus(state,message){
+    if(storageFailed.has(activeTerminal)){state="error";message="Device storage unavailable — keep this page open";}
+    status={state,message};
+    const icon=document.getElementById("cloudStatus"),label=document.getElementById("cloudStatusText");
+    if(icon){icon.dataset.state=state;icon.title=message;icon.setAttribute("aria-label",message);}
+    if(label)label.textContent=message;
   }
-  async function upload(state){
-    const report_date=dateISO(state?.date);if(!report_date||!state?.terminal)return false;
-    const r=await fetch(`${REST_URL}?on_conflict=report_date,terminal`,{method:"POST",headers:{...HEADERS,Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({report_date,terminal:state.terminal,app_state:state}),cache:"no-store",keepalive:true});
-    if(!r.ok)throw new Error(`Supabase POST ${r.status}`);return true;
+  function write(state){
+    volatile.set(state.terminal,state);
+    try{localStorage.setItem(key(state.terminal),JSON.stringify(state));storageFailed.delete(state.terminal);return true;}
+    catch{storageFailed.add(state.terminal);setStatus("error","Device storage unavailable — keep this page open");return false;}
   }
-
-  async function recoverAndSync(){
-    if(syncing){queued=true;return}syncing=true;
+  function publish(state){window.dispatchEvent(new CustomEvent("eod:recovered",{detail:state}));}
+  function schedule(delay=300){clearTimeout(timer);timer=setTimeout(syncNow,delay);}
+  function persist(draft){
+    const state=S.save(read(draft.terminal),draft,client),durable=write(state);
+    if(draft.terminal===activeTerminal&&durable)setStatus(navigator.onLine?"pending":"offline",navigator.onLine?"Saved on this iPad · backing up":"Saved on this iPad · offline");
+    schedule();return state;
+  }
+  function select(terminal){
+    activeTerminal=terminal;
+    setStatus(terminal?(navigator.onLine?"pending":"offline"):"idle",terminal?(navigator.onLine?"Checking cloud backup":"Saved on this iPad · offline"):"Choose a terminal");
+    schedule(0);
+  }
+  const baseQuery=terminal=>`report_date=eq.${iso}&terminal=eq.${encodeURIComponent(terminal)}`;
+  async function request(url,options={}){
+    const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),12000);
+    try{return await fetch(url,{headers:HEADERS,cache:"no-store",...options,signal:controller.signal});}
+    finally{clearTimeout(timeout);}
+  }
+  async function fetchCloud(terminal){
+    const response=await request(`${URL}?${baseQuery(terminal)}&select=app_state`);
+    if(!response.ok)throw new Error(`Cloud read failed (${response.status})`);
+    const rows=await response.json();return rows[0]?.app_state||null;
+  }
+  function signature(state){
+    if(!state)return "";
+    const sync={...S.normalize(state)._sync};delete sync.revision;
+    sync.records=Object.fromEntries(Object.entries(sync.records).sort(([a],[b])=>a.localeCompare(b)));
+    return JSON.stringify({terminal:state.terminal,date:state.date,_sync:sync});
+  }
+  async function upload(state,cloud){
+    const revision=crypto.randomUUID(),next={...state,_sync:{...state._sync,revision}};
+    // Only update the revision read earlier. A competing writer triggers a merge/retry.
+    const filter=cloud?`&app_state->_sync->>revision=${cloud._sync?.revision?"eq."+encodeURIComponent(cloud._sync.revision):"is.null"}`:"";
+    const response=await request(cloud?`${URL}?${baseQuery(state.terminal)}${filter}`:URL,{
+      method:cloud?"PATCH":"POST",headers:{...HEADERS,Prefer:"return=representation"},
+      body:JSON.stringify(cloud?{app_state:next}:{report_date:iso,terminal:state.terminal,app_state:next})
+    });
+    if(response.status===409)return null;
+    if(!response.ok)throw new Error(`Cloud write failed (${response.status})`);
+    const rows=await response.json();return rows[0]?.app_state?next:null;
+  }
+  async function syncNow(){
+    clearTimeout(timer);
+    if(syncing){queued=true;return;}
+    const terminal=activeTerminal;if(!terminal)return;
+    if(!navigator.onLine){setStatus("offline","Saved on this iPad · offline");return;}
+    syncing=true;if(status.state!=="saved")setStatus("pending","Backing up to cloud");
     try{
-      const cloud=await fetchCloud();
-      const local=readLocal();
-      const combined=mergeStates(cloud,local);
-      if(!combined)return;
-      const before=local?JSON.stringify(local):"";
-      const after=JSON.stringify(combined);
-      writeLocal(combined);
-
-      if(after!==before && cloud && !sessionStorage.getItem("eod_recovered_once")){
-        sessionStorage.setItem("eod_recovered_once","1");
-        // The page has already initialized by the time this runs. Reload once
-        // so index.html reads the recovered daily record and renders it.
-        window.location.reload();
-        return;
+      for(let attempt=0;attempt<4;attempt++){
+        const cloud=await fetchCloud(terminal);if(activeTerminal!==terminal)return;
+        const local=read(terminal),combined=S.merge(cloud,local);
+        if(!combined){setStatus("idle","Ready for your first inspection");return;}
+        const before=signature(local),durable=write(combined);
+        if(signature(combined)!==before)publish(combined);
+        if(cloud?._sync?.version===1&&signature(cloud)===signature(combined)){
+          if(durable)setStatus("saved","Cloud backup complete");return;
+        }
+        setStatus("pending","Backing up to cloud");
+        const uploaded=await upload(combined,cloud);if(activeTerminal!==terminal)return;
+        if(!uploaded)continue;
+        const current=read(terminal),latest=S.merge(uploaded,current);write(latest);
+        if(signature(current)!==signature(latest))publish(latest);
+        // Read back before showing the check mark; changes during upload stay pending.
+        const confirmed=await fetchCloud(terminal);if(activeTerminal!==terminal)return;
+        const merged=S.merge(confirmed,read(terminal)),old=signature(read(terminal)),saved=write(merged);
+        if(old!==signature(merged))publish(merged);
+        if(signature(confirmed)===signature(merged)){
+          if(saved)setStatus("saved","Cloud backup complete");return;
+        }
       }
-
-      if(after!==JSON.stringify(cloud)||after!==lastUploadedSignature){
-        await upload(combined);
-        lastUploadedSignature=after;
+      setStatus("pending","Changes saved here · retrying cloud backup");schedule(1500);
+    }catch(error){
+      if(activeTerminal===terminal){
+        setStatus(navigator.onLine?"error":"offline",navigator.onLine?"Saved here · cloud unavailable · tap to retry":"Saved on this iPad · offline");schedule(5000);
       }
-    }catch(e){
-      console.warn("EOD cloud sync failed; retrying",e);
-      clearTimeout(retryTimer);retryTimer=setTimeout(()=>{lastUploadedSignature="";recoverAndSync()},5000);
-    }finally{
-      syncing=false;if(queued){queued=false;setTimeout(recoverAndSync,50)}
-    }
+      console.warn("EOD backup will retry",error.message);
+    }finally{syncing=false;if(queued||activeTerminal!==terminal){queued=false;schedule(0);}}
   }
-
-  const originalSetItem=Storage.prototype.setItem;
-  Storage.prototype.setItem=function(key,value){
-    const result=originalSetItem.call(this,key,value);
-    if(key?.startsWith(PREFIX)){clearTimeout(retryTimer);retryTimer=setTimeout(recoverAndSync,250)}
-    return result;
-  };
-  window.addEventListener("online",()=>{lastUploadedSignature="";recoverAndSync()});
-  document.addEventListener("visibilitychange",()=>{if(!document.hidden){lastUploadedSignature="";recoverAndSync()}});
-  window.addEventListener("pagehide",()=>{const s=readLocal();if(s)upload(s).catch(()=>{})});
-  window.EODCloud={syncNow:recoverAndSync,backupCurrentState:recoverAndSync};
-
-  // Critical startup fix: wait until the HTML controls exist before querying
-  // Supabase. Previously the recovery request could run while #terminal was
-  // not yet in the document, making startup timing-dependent on iOS Safari.
-  const start=()=>{
-    setTimeout(recoverAndSync,100);
-    setInterval(recoverAndSync,5000);
-  };
-  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start,{once:true});
-  else start();
+  window.addEventListener("online",()=>{setStatus("pending","Connection restored · backing up");schedule(0);});
+  window.addEventListener("offline",()=>setStatus("offline","Saved on this iPad · offline"));
+  window.addEventListener("storage",event=>{
+    if(event.key===key(activeTerminal)){
+      const remote=parse(event.newValue);
+      if(remote){
+        const before=signature(read(activeTerminal)),combined=S.merge(read(activeTerminal),remote);
+        // Avoid bouncing equivalent writes between two tabs through storage events.
+        if(signature(combined)===signature(remote))volatile.set(activeTerminal,combined);
+        else write(combined);
+        if(before!==signature(combined)){publish(combined);setStatus("pending","Checking cloud backup");schedule(0);}
+      }
+    }
+  });
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden)schedule(0);});
+  window.EODCloud={read,persist,select,syncNow,backupCurrentState:syncNow,getStatus:()=>status};
+  document.addEventListener("DOMContentLoaded",()=>{
+    document.getElementById("cloudStatus")?.addEventListener("click",syncNow);
+    setInterval(()=>{if(!document.hidden)syncNow();},10000);
+  },{once:true});
 })();

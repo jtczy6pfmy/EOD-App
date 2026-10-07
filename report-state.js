@@ -7,6 +7,24 @@
   const emptyData=()=>Object.fromEntries(Object.entries(TYPES).map(([category,types])=>[category,Object.fromEntries(types.map(type=>[type,{[section(type)]:[]}]))]).concat([["tireAudits",0]]));
   const flatten=data=>Object.keys(TYPES).flatMap(category=>Object.entries(data?.[category]||{}).flatMap(([type,groups])=>Object.values(groups).flatMap(items=>(Array.isArray(items)?items:[]).map(item=>({category,type,number:item[0],condition:item[1],note:item[2]||"",id:item[3]})))));
   const legacyId=r=>"legacy:"+JSON.stringify([r.category,r.type,r.number,r.condition,r.note]);
+  const identity=r=>JSON.stringify([r.category,r.type,r.number.trim().toUpperCase().replace(/\s+/g," ")]);
+  function reconcile(records){
+    // An edit explicitly replaces earlier versions of its original equipment/type.
+    // Keep tombstones so stale legacy backups cannot bring the error entry back.
+    const sources=Object.values(records).filter(record=>!record.replacedBy);
+    sources.forEach(source=>Object.entries(records).forEach(([id,candidate])=>{
+      if(id===source.id||candidate.deleted)return;
+      const replaced=source.replaces?.includes(identity(candidate))||(source.deleted&&identity(source)===identity(candidate));
+      if(replaced&&choose(source,candidate)===source)records[id]={...candidate,deleted:true,updated:source.updated,replacedBy:source.id};
+    }));
+    return records;
+  }
+  function fingerprint(state){
+    if(!state)return "";
+    const sync={...normalize(state)._sync};delete sync.revision;
+    const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==="object"?Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])):value;
+    return JSON.stringify(canonical({terminal:state.terminal,date:state.date,_sync:sync}));
+  }
   function materialize(state){
     const result=clone(state),data=emptyData();
     Object.entries(result._sync.records).sort(([aid,a],[bid,b])=>Number((a.created||a.updated).split(":")[0])-Number((b.created||b.updated).split(":")[0])||aid.localeCompare(bid)).forEach(([id,r])=>{
@@ -35,7 +53,7 @@
     const records={};
     new Set([...Object.keys(a._sync.records),...Object.keys(b._sync.records)]).forEach(id=>{records[id]=choose(a._sync.records[id],b._sync.records[id]);});
     const fields={};["notes","tireAudits"].forEach(key=>{fields[key]=choose(a._sync.fields[key],b._sync.fields[key]);});
-    return materialize({...b,_sync:{version:1,records,fields}});
+    return materialize({...b,_sync:{version:1,records:reconcile(records),fields}});
   }
   function save(previous,draft,client,now=Date.now()){
     previous=normalize(previous)||normalize({...draft,data:emptyData(),notes:""});
@@ -47,11 +65,12 @@
       const id=r.id||root.crypto.randomUUID();live.add(id);
       const old=sync.records[id];
       const changed=!old||old.deleted||["category","type","number","condition","note"].some(key=>old[key]!==r[key]);
-      sync.records[id]=changed?{...r,id,created:old?.created||updated,updated,deleted:false}:old;
+      sync.records[id]=changed?{...r,id,created:old?.created||updated,updated,deleted:false,replaces:old?[...new Set([...(old.replaces||[]),identity(old)])]:[]}:old;
     });
     Object.entries(sync.records).forEach(([id,r])=>{if(!r.deleted&&!live.has(id))sync.records[id]={...r,deleted:true,updated};});
     const values={notes:draft.notes||"",tireAudits:Number(draft.data.tireAudits)||0};
     Object.entries(values).forEach(([key,value])=>{if(sync.fields[key].value!==value)sync.fields[key]={value,updated};});
+    reconcile(sync.records);
     return materialize({...draft,_sync:sync});
   }
   function validate(category,type,number,terminal,records=[],excludeId){
@@ -69,6 +88,6 @@
     if(records.some(r=>r.id!==excludeId&&r.category===category&&r.type===type&&r.number.trim().toUpperCase()===normalized))return "This equipment already has an inspection of this type.";
     return "";
   }
-  root.EODState={TYPES,section,emptyData,flatten,normalize,merge,save,validate};
+  root.EODState={TYPES,section,emptyData,flatten,normalize,merge,save,validate,fingerprint};
   if(typeof module!=="undefined")module.exports=root.EODState;
 })(typeof window!=="undefined"?window:globalThis);

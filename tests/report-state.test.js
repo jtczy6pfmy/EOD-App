@@ -51,3 +51,22 @@ test('all categories validate duplicates, codes, prefixes and AIMZ length',()=>{
  assert.match(S.validate('chassis','5652','AIMZ 123456','HARRISBURG'),/5 digits/);
  assert.match(S.validate('racks','5657','ABCD 123456','HARRISBURG'),/ZNSU/);
 });
+test('database JSON key reordering does not make a confirmed backup look pending',()=>{
+ const state=initial();
+ const reorder=value=>Array.isArray(value)?value.map(reorder):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).reverse().map(([key,v])=>[key,reorder(v)])):value;
+ const cloud=reorder(state);cloud._sync.revision='server-revision';
+ assert.equal(S.fingerprint(state),S.fingerprint(cloud));
+ assert.equal(S.fingerprint(cloud),S.fingerprint(S.merge(cloud,state)));
+});
+test('editing legacy duplicates removes every old error version, including after recovery',()=>{
+ const legacy=draft();
+ legacy.data.chassis['5652']['Pre-repair'].push(['NSPZ 123456','Defect','error'],['NSPZ 123456','No Defect','old correction']);
+ const old=S.normalize(legacy),d=copy(old);
+ d.data.chassis['5652']['Pre-repair'][0][0]='NSPZ 654321';
+ d.data.chassis['5652']['Pre-repair'][0][2]='correct';
+ const changed=S.save(old,d,'ipad',200),merged=S.merge(legacy,changed);
+ assert.equal(S.flatten(changed.data).length,1);
+ assert.equal(S.flatten(merged.data).length,1);
+ assert.equal(S.flatten(merged.data)[0].number,'NSPZ 654321');
+ assert.equal(Object.values(merged._sync.records).filter(r=>r.deleted).length,1);
+});

@@ -58,10 +58,7 @@
     const rows=await response.json();return rows[0]?.app_state||null;
   }
   function signature(state){
-    if(!state)return "";
-    const sync={...S.normalize(state)._sync};delete sync.revision;
-    sync.records=Object.fromEntries(Object.entries(sync.records).sort(([a],[b])=>a.localeCompare(b)));
-    return JSON.stringify({terminal:state.terminal,date:state.date,_sync:sync});
+    return S.fingerprint(state);
   }
   async function upload(state,cloud){
     const revision=crypto.randomUUID(),next={...state,_sync:{...state._sync,revision}};

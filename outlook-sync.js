@@ -7,7 +7,7 @@ const KEY="eod_combined_reports_v1";
 const HEADERS=["Lot Loc","Eq Init Nr","Mate Init Nr","Hold List","Hold Category","Dwell DD HH"];
 let sortColumn="Lot Loc",sortDirection=1;
 const sorter=new Intl.Collator(undefined,{numeric:true,sensitivity:"base"});
-const isDcli=row=>/^(?:DCLI|DDRZ)/i.test(String(row["Eq Init Nr"]||"").trim())||/^(?:DCLI|DDRZ)/i.test(String(row["Mate Init Nr"]||"").trim());
+const allowedChassis=row=>/^(?:AIMZ|NSPZ|NSFZ)/i.test(String(row["Eq Init Nr"]||"").trim());
 const fileInput=document.createElement("input");
 fileInput.type="file";fileInput.accept=".xlsx,.xls";fileInput.multiple=true;fileInput.hidden=true;
 const importButton=document.createElement("button");
@@ -37,7 +37,7 @@ function normalize(row,kind){
   out["Dwell DD HH"]=get(row,"DWELL TIME");
  }
  const chassis=out["Eq Init Nr"],equipment=out["Mate Init Nr"];
- if(/^(?:DCLI|DDRZ)/i.test(chassis)||/^(?:DCLI|DDRZ)/i.test(equipment))return null;
+ if(!allowedChassis(out))return null;
  if(/^(?:NSPZ|NSFZ)(?:\b|(?=\d))/i.test(equipment)){
   out["Eq Init Nr"]=equipment;
   out["Mate Init Nr"]="";
@@ -67,8 +67,8 @@ function readFile(file){
 function render(data){
  results.replaceChildren();
  if(!data){status.textContent="No saved reports yet";results.textContent="Forward the reports to Gmail, save the two Excel attachments, then choose Import Excel. Automatic Gmail retrieval is not connected yet.";return}
- const upcoming=(data.upcoming||[]).filter(row=>!isDcli(row));
- const bad=(data.bad||[]).filter(row=>!isDcli(row));
+ const upcoming=(data.upcoming||[]).filter(row=>allowedChassis(row));
+ const bad=(data.bad||[]).filter(row=>allowedChassis(row));
  const rows=[...upcoming,...bad].sort((a,b)=>sortDirection*sorter.compare(String(a[sortColumn]??""),String(b[sortColumn]??"")));
  const summary=document.createElement("p");
  summary.textContent=upcoming.length+" upcoming inspections · "+bad.length+" bad orders · Tap a column header to sort";
@@ -115,7 +115,7 @@ async function cloudRefresh(ask=false){
   const payload=await response.json(),reports=payload.reports||[];
   if(!reports.length){status.textContent="Cloud connected · Waiting for emailed reports";return}
   const data=load()||{upcoming:[],bad:[]};
-  for(const report of reports)if(report.report_type==="bad"||report.report_type==="upcoming")data[report.report_type]=report.rows.filter(row=>!isDcli(row));
+  for(const report of reports)if(report.report_type==="bad"||report.report_type==="upcoming")data[report.report_type]=report.rows.filter(row=>allowedChassis(row));
   data.updated=Date.now();localStorage.setItem(KEY,JSON.stringify(data));render(data);
   status.textContent="Cloud reports loaded · "+new Date().toLocaleString();
  }catch(error){status.textContent=error.message}

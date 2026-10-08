@@ -7,7 +7,7 @@ const KEY="eod_combined_reports_v1";
 const HEADERS=["Lot Loc","Eq Init Nr","Mate Init Nr","Hold List","Hold Category","Dwell DD HH"];
 let sortColumn="Lot Loc",sortDirection=1;
 const sorter=new Intl.Collator(undefined,{numeric:true,sensitivity:"base"});
-const isDcli=row=>/^DCLI/i.test(String(row["Eq Init Nr"]||"").trim())||/^DCLI/i.test(String(row["Mate Init Nr"]||"").trim());
+const isDcli=row=>/^(?:DCLI|DDRZ)/i.test(String(row["Eq Init Nr"]||"").trim())||/^(?:DCLI|DDRZ)/i.test(String(row["Mate Init Nr"]||"").trim());
 const fileInput=document.createElement("input");
 fileInput.type="file";fileInput.accept=".xlsx,.xls";fileInput.multiple=true;fileInput.hidden=true;
 const importButton=document.createElement("button");
@@ -37,7 +37,7 @@ function normalize(row,kind){
   out["Dwell DD HH"]=get(row,"DWELL TIME");
  }
  const chassis=out["Eq Init Nr"],equipment=out["Mate Init Nr"];
- if(/^DCLI/i.test(chassis)||/^DCLI/i.test(equipment))return null;
+ if(/^(?:DCLI|DDRZ)/i.test(chassis)||/^(?:DCLI|DDRZ)/i.test(equipment))return null;
  if(/^(?:NSPZ|NSFZ)(?:\b|(?=\d))/i.test(equipment)){
   out["Eq Init Nr"]=equipment;
   out["Mate Init Nr"]="";

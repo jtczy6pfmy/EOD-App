@@ -43,22 +43,49 @@ function parseWorkbook(bytes){
  }
  return records;
 }
+const HEADERS=["Lot Loc","Eq Init Nr","Mate Init Nr","Hold List","Hold Category","Dwell DD HH"];
+function field(row,...names){
+ const entries=Object.entries(row);
+ for(const name of names){const key=name.toUpperCase().replace(/[^A-Z0-9]/g,"");const found=entries.find(([k])=>k.toUpperCase().replace(/[^A-Z0-9]/g,"")===key);if(found)return String(found[1]??"").trim()}
+ return "";
+}
+function normalize(row,kind){
+ const result={};
+ if(kind==="bad"){
+  for(const header of HEADERS)result[header]=field(row,header);
+ }else{
+  result["Lot Loc"]=field(row,"LOT LOC");
+  result["Eq Init Nr"]=field(row,"CHASSIS");
+  result["Mate Init Nr"]=field(row,"EQUIPMENT");
+  result["Hold List"]="FHWA";
+  const status=field(row,"FHWA STATUS"),date=field(row,"FHWA Date");
+  result["Hold Category"]=[status,date].filter(Boolean).join(" · ");
+  result["Dwell DD HH"]=field(row,"DWELL TIME");
+ }
+ // DCLI is an exact equipment prefix, not a synonym for AIMZ or any other chassis.
+ const chassis=result["Eq Init Nr"],equipment=result["Mate Init Nr"];
+ if(/\bDCLI\b/i.test(chassis)||/^DCLI[\s-]*[0-9]/i.test(chassis))return null;
+ if(/^(NSPZ|NSFZ)\b/i.test(equipment)||/^(NSPZ|NSFZ)[\s-]*[0-9]/i.test(equipment)){
+  result["Eq Init Nr"]=equipment;
+  result["Mate Init Nr"]="";
+ }
+ return result;
+}
 function tableFor(rows){
  const table=document.createElement("table");
  table.style.cssText="width:100%;border-collapse:collapse;font-size:.8rem";
- const columns=[...new Set(rows.flatMap(r=>Object.keys(r)))].slice(0,25);
  const thead=document.createElement("thead"),header=document.createElement("tr");
- for(const col of ["Source",...columns]){const th=document.createElement("th");th.textContent=col;th.style.cssText="text-align:left;padding:7px;border-bottom:1px solid #cbd5e1";header.append(th)}
+ for(const col of HEADERS){const th=document.createElement("th");th.textContent=col;th.style.cssText="text-align:left;padding:7px;border-bottom:1px solid #cbd5e1";header.append(th)}
  thead.append(header);table.append(thead);
  const body=document.createElement("tbody");
  for(const row of rows.slice(0,500)){
   const tr=document.createElement("tr");
-  for(const col of ["Source",...columns]){const td=document.createElement("td");td.textContent=String(row[col]??"");td.style.cssText="padding:7px;border-bottom:1px solid #e2e8f0";tr.append(td)}
+  for(const col of HEADERS){const td=document.createElement("td");td.textContent=String(row[col]??"");td.style.cssText="padding:7px;border-bottom:1px solid #e2e8f0";tr.append(td)}
   body.append(tr);
  }
  table.append(body);return table;
 }
-async function run(){
+async function run(interactive=true){
  saveSettings();
  const clientId=clientInput.value.trim(),folderId=folderInput.value.trim();
  if(!clientId){settings.open=true;clientInput.focus();message("Enter your Microsoft application client ID to connect Outlook.");return}
@@ -91,6 +118,7 @@ async function run(){
    }
   }
   if(!token){
+   if(!interactive){message("Outlook authorization needed — press Sync to connect.");return}
    message("Microsoft authorization required. Opening sign-in…");
    sessionStorage.setItem("eod_outlook_resume_sync","1");
    await app.loginRedirect({...request,prompt:"select_account"});
@@ -111,7 +139,7 @@ async function run(){
     const full=item.contentBytes?item:await graph("https://graph.microsoft.com/v1.0/me/messages/"+encodeURIComponent(email.id)+"/attachments/"+encodeURIComponent(item.id),token);
     if(!full.contentBytes)continue;
     const rows=parseWorkbook(binaryFromBase64(full.contentBytes));
-    found[label]=rows.map(r=>({Source:label==="bad"?"Bad Orders":"Upcoming Inspections",...r}));
+    found[label]=rows.map(r=>normalize(r,label)).filter(Boolean);
     files++;
    }
    if(found.bad.length&&found.upcoming.length)break;
@@ -127,9 +155,11 @@ async function run(){
  }catch(error){message("Sync failed: "+(error?.message||String(error)))}
  finally{button.disabled=false;button.textContent="↻ Sync"}
 }
-button.addEventListener("click",run);
+button.addEventListener("click",()=>run(true));
 if(sessionStorage.getItem("eod_outlook_resume_sync")==="1"){
  sessionStorage.removeItem("eod_outlook_resume_sync");
- run();
+ run(true);
+}else{
+ run(false);
 }
 })();

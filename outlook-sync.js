@@ -109,21 +109,19 @@ fileInput.addEventListener("change",async()=>{
 
 const endpoint="https://tjhsrydhkigvhlllnstm.supabase.co/functions/v1/eod-mail-reports";
 async function cloudRefresh(ask=false){
- let token=sessionStorage.getItem("eod_mail_cloud_token");
- if(!token&&ask){token=prompt("Enter your EOD report sync access token (configured in Supabase):")||"";if(token)sessionStorage.setItem("eod_mail_cloud_token",token)}
- if(!token){status.textContent="Tap Sync to connect reports";return;}
+ 
  try{
-  const response=await fetch(endpoint,{headers:{"x-eod-token":token},cache:"no-store"});
-  if(!response.ok){if(response.status===401)sessionStorage.removeItem("eod_mail_cloud_token");throw Error("Cloud reports unavailable ("+response.status+")")}
+  const response=await fetch(endpoint,{cache:"no-store"});
+  if(!response.ok){throw Error("Cloud reports unavailable ("+response.status+")")}
   const payload=await response.json(),reports=payload.reports||[];
   if(!reports.length){status.textContent="Cloud connected · Waiting for emailed reports";return}
   const data=load()||{upcoming:[],bad:[]};
-  for(const report of reports)if(report.report_type==="bad"||report.report_type==="upcoming")data[report.report_type]=report.rows.filter(row=>allowedChassis(row));
+  for(const report of reports)if(report.report_type==="bad"||report.report_type==="upcoming")data[report.report_type]=report.rows.filter(row=>outstanding(row));
   data.updated=Date.now();localStorage.setItem(KEY,JSON.stringify(data));render(data);
   status.textContent="Updated "+new Date().toLocaleString();
  }catch(error){status.textContent=error.message}
 }
-button.addEventListener("click",()=>cloudRefresh(true));
+button.addEventListener("click",()=>cloudRefresh(false));
 cloudRefresh(false);
 
 // The existing Add Inspection handler clears the chassis number only after a successful save.

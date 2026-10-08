@@ -18,9 +18,9 @@ fileInput.type="file";fileInput.accept=".xlsx,.xls";fileInput.multiple=true;file
 const importButton=document.createElement("button");
 importButton.type="button";importButton.textContent="Import Excel";
 importButton.style.cssText="width:auto;background:#ffc107;color:#001338;padding:8px 12px;margin-left:8px";
-button.after(importButton,fileInput);
+button.after(fileInput);
 button.setAttribute("aria-label","Refresh saved Upcoming and Bad Orders");
-importButton.addEventListener("click",()=>fileInput.click());
+
 function get(row,...names){
  const entries=Object.entries(row);
  for(const name of names){
@@ -71,12 +71,12 @@ function readFile(file){
 }
 function render(data){
  results.replaceChildren();
- if(!data){status.textContent="No saved reports yet";results.textContent="Forward the reports to Gmail, save the two Excel attachments, then choose Import Excel. Automatic Gmail retrieval is not connected yet.";return}
+ if(!data){status.textContent="No saved reports yet";results.textContent="Tap Sync to load your reports.";return}
  const upcoming=(data.upcoming||[]).filter(row=>outstanding(row));
  const bad=(data.bad||[]).filter(row=>outstanding(row));
  const rows=[...upcoming,...bad].sort((a,b)=>sortDirection*sorter.compare(String(a[sortColumn]??""),String(b[sortColumn]??"")));
  const summary=document.createElement("p");
- summary.textContent=upcoming.length+" upcoming inspections · "+bad.length+" bad orders · Tap a column header to sort";
+ summary.textContent=upcoming.length+" upcoming inspections · "+bad.length+" bad orders";
  results.append(summary);
  const wrap=document.createElement("div");wrap.style.overflowX="auto";
  const table=document.createElement("table");table.style.cssText="width:100%;border-collapse:collapse;font-size:.8rem";
@@ -86,7 +86,7 @@ function render(data){
  const tbody=document.createElement("tbody");
  for(const row of rows.slice(0,500)){const tr=document.createElement("tr");for(const h of HEADERS){const td=document.createElement("td");td.textContent=row[h]||"";td.style.cssText="padding:7px;border-bottom:1px solid #e2e8f0";tr.append(td)}tbody.append(tr)}
  table.append(tbody);wrap.append(table);results.append(wrap);
- status.textContent="Saved reports · Updated "+new Date(data.updated).toLocaleString()+(rows.length>500?" · First 500 shown":"");
+ status.textContent="Updated "+new Date(data.updated).toLocaleString()+(rows.length>500?" · First 500 shown":"");
 }
 function load(){try{return JSON.parse(localStorage.getItem(KEY)||"null")}catch{return null}}
 button.addEventListener("click",()=>render(load()));
@@ -106,14 +106,12 @@ fileInput.addEventListener("change",async()=>{
  }catch(error){status.textContent="Import failed: "+error.message}
  finally{importButton.disabled=false;fileInput.value=""}
 });
-const cloud=document.createElement("button");
-cloud.type="button";cloud.textContent="Connect cloud reports";cloud.style.cssText="width:auto;padding:8px 12px;margin-left:8px";
-importButton.after(cloud);
+
 const endpoint="https://tjhsrydhkigvhlllnstm.supabase.co/functions/v1/eod-mail-reports";
 async function cloudRefresh(ask=false){
  let token=sessionStorage.getItem("eod_mail_cloud_token");
  if(!token&&ask){token=prompt("Enter your EOD report sync access token (configured in Supabase):")||"";if(token)sessionStorage.setItem("eod_mail_cloud_token",token)}
- if(!token)return;
+ if(!token){status.textContent="Tap Sync to connect reports";return;}
  try{
   const response=await fetch(endpoint,{headers:{"x-eod-token":token},cache:"no-store"});
   if(!response.ok){if(response.status===401)sessionStorage.removeItem("eod_mail_cloud_token");throw Error("Cloud reports unavailable ("+response.status+")")}
@@ -122,11 +120,10 @@ async function cloudRefresh(ask=false){
   const data=load()||{upcoming:[],bad:[]};
   for(const report of reports)if(report.report_type==="bad"||report.report_type==="upcoming")data[report.report_type]=report.rows.filter(row=>allowedChassis(row));
   data.updated=Date.now();localStorage.setItem(KEY,JSON.stringify(data));render(data);
-  status.textContent="Cloud reports loaded · "+new Date().toLocaleString();
+  status.textContent="Updated "+new Date().toLocaleString();
  }catch(error){status.textContent=error.message}
 }
-cloud.addEventListener("click",()=>cloudRefresh(true));
-button.addEventListener("click",()=>cloudRefresh(false));
+button.addEventListener("click",()=>cloudRefresh(true));
 cloudRefresh(false);
 
 // The existing Add Inspection handler clears the chassis number only after a successful save.

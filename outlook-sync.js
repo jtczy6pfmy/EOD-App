@@ -10,7 +10,7 @@ function completed(){try{return new Set(JSON.parse(localStorage.getItem(COMPLETE
 function markCompleted(row){const ids=completed();ids.add(assetKey(row));localStorage.setItem(COMPLETED_KEY,JSON.stringify([...ids]));render(load())}
 const outstanding=row=>allowedChassis(row)&&!completed().has(assetKey(row));
 const HEADERS=["Lot Loc","Eq Init Nr","Mate Init Nr","Hold List","Hold Category","Dwell DD HH"];
-let sortColumn="Lot Loc",sortDirection=1;
+let sortColumn="Lot Loc",sortDirection=1,selectedLot="";
 const sorter=new Intl.Collator(undefined,{numeric:true,sensitivity:"base"});
 const allowedChassis=row=>/^(?:AIMZ|NSPZ|NSFZ)/i.test(String(row["Eq Init Nr"]||"").trim());
 const fileInput=document.createElement("input");
@@ -74,10 +74,20 @@ function render(data){
  if(!data){status.textContent="No saved reports yet";results.textContent="Tap Sync to load your reports.";return}
  const upcoming=(data.upcoming||[]).filter(row=>outstanding(row));
  const bad=(data.bad||[]).filter(row=>outstanding(row));
- const rows=[...upcoming,...bad].sort((a,b)=>sortDirection*sorter.compare(String(a[sortColumn]??""),String(b[sortColumn]??"")));
+ const allRows=[...upcoming,...bad];
+ const lots=[...new Set(allRows.map(row=>String(row["Lot Loc"]||"").trim()).filter(Boolean))].sort(sorter.compare);
+ if(selectedLot&&!lots.includes(selectedLot))selectedLot="";
+ const rows=allRows.filter(row=>!selectedLot||String(row["Lot Loc"]||"").trim()===selectedLot).sort((a,b)=>sortDirection*sorter.compare(String(a[sortColumn]??""),String(b[sortColumn]??"")));
  const summary=document.createElement("p");
  summary.textContent=upcoming.length+" upcoming inspections · "+bad.length+" bad orders";
  results.append(summary);
+ const filterBar=document.createElement("div");filterBar.style.cssText="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0";
+ const filterLabel=document.createElement("label");filterLabel.textContent="Lot Loc";filterLabel.htmlFor="eodLotFilter";filterLabel.style.fontWeight="600";
+ const lotSelect=document.createElement("select");lotSelect.id="eodLotFilter";lotSelect.setAttribute("aria-label","Filter by Lot Loc");lotSelect.style.cssText="width:auto;max-width:100%;min-width:155px;padding:7px;border-radius:6px";
+ for(const lot of ["",...lots]){const option=document.createElement("option");option.value=lot;option.textContent=lot||"All Locations";lotSelect.append(option)}
+ lotSelect.value=selectedLot;lotSelect.addEventListener("change",()=>{selectedLot=lotSelect.value;render(load())});
+ const visibleCount=document.createElement("span");visibleCount.textContent=rows.length+" shown";visibleCount.style.cssText="font-size:.8rem;opacity:.8";
+ filterBar.append(filterLabel,lotSelect,visibleCount);results.append(filterBar);
  const wrap=document.createElement("div");wrap.style.overflowX="auto";
  const table=document.createElement("table");table.style.cssText="width:100%;border-collapse:collapse;font-size:.8rem";
  const head=document.createElement("tr");

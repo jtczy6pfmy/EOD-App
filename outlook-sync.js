@@ -4,6 +4,11 @@
 const button=document.getElementById("outlookSyncButton"),status=document.getElementById("outlookSyncStatus"),results=document.getElementById("outlookSyncResults");
 if(!button||!status||!results)return;
 const KEY="eod_combined_reports_v1";
+const COMPLETED_KEY="eod_completed_assets_v1";
+const assetKey=row=>String(row["Eq Init Nr"]||"").toUpperCase().replace(/[^A-Z0-9]/g,"");
+function completed(){try{return new Set(JSON.parse(localStorage.getItem(COMPLETED_KEY)||"[]"))}catch{return new Set()}}
+function markCompleted(row){const ids=completed();ids.add(assetKey(row));localStorage.setItem(COMPLETED_KEY,JSON.stringify([...ids]));render(load())}
+const outstanding=row=>allowedChassis(row)&&!completed().has(assetKey(row));
 const HEADERS=["Lot Loc","Eq Init Nr","Mate Init Nr","Hold List","Hold Category","Dwell DD HH"];
 let sortColumn="Lot Loc",sortDirection=1;
 const sorter=new Intl.Collator(undefined,{numeric:true,sensitivity:"base"});
@@ -67,7 +72,7 @@ function readFile(file){
 function render(data){
  results.replaceChildren();
  if(!data){status.textContent="No saved reports yet";results.textContent="Forward the reports to Gmail, save the two Excel attachments, then choose Import Excel. Automatic Gmail retrieval is not connected yet.";return}
- const upcoming=(data.upcoming||[]).filter(row=>allowedChassis(row));
+ const upcoming=(data.upcoming||[]).filter(row=>outstanding(row));
  const bad=(data.bad||[]).filter(row=>allowedChassis(row));
  const rows=[...upcoming,...bad].sort((a,b)=>sortDirection*sorter.compare(String(a[sortColumn]??""),String(b[sortColumn]??"")));
  const summary=document.createElement("p");
@@ -77,9 +82,9 @@ function render(data){
  const table=document.createElement("table");table.style.cssText="width:100%;border-collapse:collapse;font-size:.8rem";
  const head=document.createElement("tr");
  for(const h of HEADERS){const th=document.createElement("th");const sortButton=document.createElement("button");sortButton.type="button";sortButton.textContent=h+(sortColumn===h?(sortDirection===1?" ▲":" ▼"):" ⇅");sortButton.setAttribute("aria-label","Sort by "+h);sortButton.setAttribute("aria-pressed",String(sortColumn===h));sortButton.style.cssText="width:auto;background:transparent;color:inherit;border:0;padding:7px 4px;font:inherit;font-weight:700;cursor:pointer;white-space:nowrap";sortButton.addEventListener("click",()=>{if(sortColumn===h)sortDirection*=-1;else{sortColumn=h;sortDirection=1}render(load())});th.append(sortButton);th.style.cssText="text-align:left;padding:2px;border-bottom:1px solid #cbd5e1";head.append(th)}
- const thead=document.createElement("thead");thead.append(head);table.append(thead);
+ const actionHead=document.createElement("th");actionHead.textContent="Action";head.append(actionHead);const thead=document.createElement("thead");thead.append(head);table.append(thead);
  const tbody=document.createElement("tbody");
- for(const row of rows.slice(0,500)){const tr=document.createElement("tr");for(const h of HEADERS){const td=document.createElement("td");td.textContent=row[h]||"";td.style.cssText="padding:7px;border-bottom:1px solid #e2e8f0";tr.append(td)}tbody.append(tr)}
+ for(const row of rows.slice(0,500)){const tr=document.createElement("tr");for(const h of HEADERS){const td=document.createElement("td");td.textContent=row[h]||"";td.style.cssText="padding:7px;border-bottom:1px solid #e2e8f0";tr.append(td)}const td=document.createElement("td");const done=document.createElement("button");done.type="button";done.textContent="Completed";done.setAttribute("aria-label","Mark "+row["Eq Init Nr"]+" inspection completed");done.style.cssText="width:auto;padding:5px 9px;font-size:.75rem";done.addEventListener("click",()=>{if(confirm("Remove "+row["Eq Init Nr"]+" from outstanding inspections?"))markCompleted(row)});td.append(done);tr.append(td);tbody.append(tr)}
  table.append(tbody);wrap.append(table);results.append(wrap);
  status.textContent="Saved reports · Updated "+new Date(data.updated).toLocaleString()+(rows.length>500?" · First 500 shown":"");
 }

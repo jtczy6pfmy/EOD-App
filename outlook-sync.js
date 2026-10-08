@@ -67,6 +67,8 @@ async function run(){
  try{
   const app=new msal.PublicClientApplication({auth:{clientId,authority:"https://login.microsoftonline.com/22e0df06-ddf6-478c-bc1b-e26c7bfac8ee",redirectUri:location.origin+location.pathname},cache:{cacheLocation:"localStorage"}});
   if(typeof app.initialize==="function")await app.initialize();
+  const redirectResult=await app.handleRedirectPromise();
+  if(redirectResult?.account)app.setActiveAccount(redirectResult.account);
   const request={scopes:["Mail.Read"]};
   let account=app.getActiveAccount()||app.getAllAccounts()[0],token;
   if(account){
@@ -90,10 +92,9 @@ async function run(){
   }
   if(!token){
    message("Microsoft authorization required. Opening sign-in…");
-   const login=await app.loginPopup({...request,prompt:"select_account"});
-   account=login.account;
-   if(account)app.setActiveAccount(account);
-   token=login.accessToken||(await app.acquireTokenSilent({...request,account})).accessToken;
+   sessionStorage.setItem("eod_outlook_resume_sync","1");
+   await app.loginRedirect({...request,prompt:"select_account"});
+   return;
   }
   const base="https://graph.microsoft.com/v1.0/me/mailFolders/"+encodeURIComponent(folderId||"inbox");
   message("Reading Outlook folder…");
@@ -127,4 +128,8 @@ async function run(){
  finally{button.disabled=false;button.textContent="↻ Sync"}
 }
 button.addEventListener("click",run);
+if(sessionStorage.getItem("eod_outlook_resume_sync")==="1"){
+ sessionStorage.removeItem("eod_outlook_resume_sync");
+ run();
+}
 })();

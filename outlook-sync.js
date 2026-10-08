@@ -12,7 +12,7 @@ settings.innerHTML='<summary style="cursor:pointer;font-weight:600">Outlook sync
 results.before(settings);
 const clientInput=settings.querySelector("#outlookClientId");
 const folderInput=settings.querySelector("#outlookFolderId");
-clientInput.value=config.clientId||"";
+clientInput.value=config.clientId||"369f33df-a218-4a36-8e2c-55903325ff90";
 folderInput.value=config.folderId||"";
 function saveSettings(){localStorage.setItem(KEY,JSON.stringify({clientId:clientInput.value.trim(),folderId:folderInput.value.trim()}))}
 clientInput.addEventListener("change",saveSettings);
@@ -65,7 +65,7 @@ async function run(){
  if(!window.msal||!window.XLSX){message("Microsoft sign-in or Excel parser could not load. Check your internet connection.");return}
  button.disabled=true;button.textContent="Syncing…";message("Signing in to Outlook…");
  try{
-  const app=new msal.PublicClientApplication({auth:{clientId,authority:"https://login.microsoftonline.com/common",redirectUri:location.origin+location.pathname},cache:{cacheLocation:"localStorage"}});
+  const app=new msal.PublicClientApplication({auth:{clientId,authority:"https://login.microsoftonline.com/22e0df06-ddf6-478c-bc1b-e26c7bfac8ee",redirectUri:location.origin+location.pathname},cache:{cacheLocation:"localStorage"}});
   if(typeof app.initialize==="function")await app.initialize();
   const request={scopes:["Mail.Read"]};
   let account=app.getActiveAccount()||app.getAllAccounts()[0],token;

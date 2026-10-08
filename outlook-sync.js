@@ -65,12 +65,36 @@ async function run(){
  if(!window.msal||!window.XLSX){message("Microsoft sign-in or Excel parser could not load. Check your internet connection.");return}
  button.disabled=true;button.textContent="Syncing…";message("Signing in to Outlook…");
  try{
-  const app=new msal.PublicClientApplication({auth:{clientId,authority:"https://login.microsoftonline.com/common",redirectUri:location.origin+location.pathname},cache:{cacheLocation:"sessionStorage"}});
+  const app=new msal.PublicClientApplication({auth:{clientId,authority:"https://login.microsoftonline.com/common",redirectUri:location.origin+location.pathname},cache:{cacheLocation:"localStorage"}});
   if(typeof app.initialize==="function")await app.initialize();
   const request={scopes:["Mail.Read"]};
-  let account=app.getAllAccounts()[0],token;
-  if(account){try{token=(await app.acquireTokenSilent({...request,account})).accessToken}catch{}}
-  if(!token){const login=await app.loginPopup(request);account=login.account;token=login.accessToken|| (await app.acquireTokenSilent({...request,account})).accessToken}
+  let account=app.getActiveAccount()||app.getAllAccounts()[0],token;
+  if(account){
+   app.setActiveAccount(account);
+   try{token=(await app.acquireTokenSilent({...request,account})).accessToken}catch(error){
+    if(!(error instanceof msal.InteractionRequiredAuthError))throw error;
+   }
+  }
+  // An existing Outlook browser session can often supply a token without a login prompt.
+  if(!token){
+   try{
+    const silent=await app.ssoSilent(request);
+    account=silent.account;
+    if(account)app.setActiveAccount(account);
+    token=silent.accessToken;
+   }catch(error){
+    // Consent, third-party cookie restrictions, or an unknown account can require interaction.
+    if(!(error instanceof msal.InteractionRequiredAuthError)&&
+       !["login_required","interaction_required","consent_required","monitor_window_timeout"].includes(error?.errorCode))throw error;
+   }
+  }
+  if(!token){
+   message("Microsoft authorization required. Opening sign-in…");
+   const login=await app.loginPopup({...request,prompt:"select_account"});
+   account=login.account;
+   if(account)app.setActiveAccount(account);
+   token=login.accessToken||(await app.acquireTokenSilent({...request,account})).accessToken;
+  }
   const base="https://graph.microsoft.com/v1.0/me/mailFolders/"+encodeURIComponent(folderId||"inbox");
   message("Reading Outlook folder…");
   const emails=await allPages(base+"/messages?$select=id,subject,receivedDateTime,hasAttachments&$orderby=receivedDateTime%20desc&$top=50",token,5);

@@ -12,7 +12,8 @@ settings.innerHTML='<summary style="cursor:pointer;font-weight:600">Outlook sync
 results.before(settings);
 const clientInput=settings.querySelector("#outlookClientId");
 const folderInput=settings.querySelector("#outlookFolderId");
-clientInput.value=config.clientId||"369f33df-a218-4a36-8e2c-55903325ff90";
+clientInput.value="f6a547fd-f423-4c03-a032-2e1e81164b3c";
+if(config.clientId&&config.clientId!=="f6a547fd-f423-4c03-a032-2e1e81164b3c"){config.clientId="f6a547fd-f423-4c03-a032-2e1e81164b3c";localStorage.setItem(KEY,JSON.stringify(config))}
 folderInput.value=config.folderId||"";
 function saveSettings(){localStorage.setItem(KEY,JSON.stringify({clientId:clientInput.value.trim(),folderId:folderInput.value.trim()}))}
 clientInput.addEventListener("change",saveSettings);

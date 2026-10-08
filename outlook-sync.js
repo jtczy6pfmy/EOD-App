@@ -96,5 +96,27 @@ fileInput.addEventListener("change",async()=>{
  }catch(error){status.textContent="Import failed: "+error.message}
  finally{importButton.disabled=false;fileInput.value=""}
 });
+const cloud=document.createElement("button");
+cloud.type="button";cloud.textContent="Connect cloud reports";cloud.style.cssText="width:auto;padding:8px 12px;margin-left:8px";
+importButton.after(cloud);
+const endpoint="https://tjhsrydhkigvhlllnstm.supabase.co/functions/v1/eod-mail-reports";
+async function cloudRefresh(ask=false){
+ let token=sessionStorage.getItem("eod_mail_cloud_token");
+ if(!token&&ask){token=prompt("Enter your EOD report sync access token (configured in Supabase):")||"";if(token)sessionStorage.setItem("eod_mail_cloud_token",token)}
+ if(!token)return;
+ try{
+  const response=await fetch(endpoint,{headers:{"x-eod-token":token},cache:"no-store"});
+  if(!response.ok){if(response.status===401)sessionStorage.removeItem("eod_mail_cloud_token");throw Error("Cloud reports unavailable ("+response.status+")")}
+  const payload=await response.json(),reports=payload.reports||[];
+  if(!reports.length){status.textContent="Cloud connected · Waiting for emailed reports";return}
+  const data=load()||{upcoming:[],bad:[]};
+  for(const report of reports)if(report.report_type==="bad"||report.report_type==="upcoming")data[report.report_type]=report.rows;
+  data.updated=Date.now();localStorage.setItem(KEY,JSON.stringify(data));render(data);
+  status.textContent="Cloud reports loaded · "+new Date().toLocaleString();
+ }catch(error){status.textContent=error.message}
+}
+cloud.addEventListener("click",()=>cloudRefresh(true));
+button.addEventListener("click",()=>cloudRefresh(false));
+cloudRefresh(false);
 render(load());
 })();

@@ -12,8 +12,8 @@ function syncEodGmailReports() {
   const token = props.getProperty('EOD_REPORT_SYNC_TOKEN');
   if (!endpoint || !token) throw Error('Set endpoint and sync token in Script Properties');
   const reports = [
-    {kind:'upcoming',query:'subject:"FHWA Inventory Due" has:attachment filename:xlsx'},
-    {kind:'bad',query:'subject:"Chassis Bad Order" has:attachment filename:xlsx'}
+    {kind:'upcoming',query:'label:Lists subject:"FHWA Inventory Due" has:attachment filename:xlsx'},
+    {kind:'bad',query:'label:Lists subject:"Chassis Bad Order" has:attachment filename:xlsx'}
   ];
   for (const report of reports) {
     const threads = GmailApp.search(report.query,0,10);

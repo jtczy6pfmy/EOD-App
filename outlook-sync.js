@@ -10,7 +10,8 @@ function completed(){try{return new Set(JSON.parse(localStorage.getItem(COMPLETE
 function markCompleted(row){const ids=completed();ids.add(assetKey(row));localStorage.setItem(COMPLETED_KEY,JSON.stringify([...ids]));render(load())}
 const outstanding=row=>allowedChassis(row)&&!completed().has(assetKey(row));
 const HEADERS=["Lot Loc","Eq Init Nr","Mate Init Nr","Hold List","Hold Category","Dwell DD HH"];
-let sortColumn="Lot Loc",sortDirection=1,selectedLots=null;
+let sortColumn="Lot Loc",sortDirection=1,selectedLots=null,reportView="all";
+window.addEventListener("eod:report-view",event=>{reportView=["all","upcoming","bad"].includes(event.detail)?event.detail:"all";render(load())});
 const sorter=new Intl.Collator(undefined,{numeric:true,sensitivity:"base"});
 const allowedChassis=row=>/^(?:AIMZ|NSPZ|NSFZ)/i.test(String(row["Eq Init Nr"]||"").trim());
 const fileInput=document.createElement("input");
@@ -74,10 +75,10 @@ function render(data){
  if(!data){status.textContent="No saved reports yet";results.textContent="Tap Sync to load your reports.";return}
  const upcoming=(data.upcoming||[]).filter(row=>outstanding(row));
  const bad=(data.bad||[]).filter(row=>outstanding(row));
- const allRows=[...upcoming,...bad];
+ const allRows=[...(reportView==="bad"?[]:upcoming),...(reportView==="upcoming"?[]:bad)];
  const lots=[...new Set(allRows.map(row=>String(row["Lot Loc"]||"").trim()))].sort(sorter.compare);
  const rows=allRows.filter(row=>selectedLots===null||selectedLots.has(String(row["Lot Loc"]||"").trim())).sort((a,b)=>sortDirection*sorter.compare(String(a[sortColumn]??""),String(b[sortColumn]??"")));
- const summary=document.createElement("p");summary.textContent=upcoming.length+" upcoming inspections · "+bad.length+" bad orders · "+rows.length+" shown";results.append(summary);
+ const summary=document.createElement("p");summary.textContent=upcoming.length+" upcoming inspections · "+bad.length+" bad orders · "+rows.length+" shown"+(reportView==="all"?"":" · "+(reportView==="bad"?"Bad orders":"Upcoming")+" view");results.append(summary);
  const wrap=document.createElement("div");wrap.style.overflowX="auto";
  const table=document.createElement("table");table.style.cssText="width:100%;border-collapse:collapse;font-size:1rem";
  const head=document.createElement("tr");

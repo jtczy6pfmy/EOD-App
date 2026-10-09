@@ -23,7 +23,7 @@ button{width:100%;padding:11px 18px;border:none;border-radius:6px;font-weight:80
 .equipment-entry{min-width:0}.equipment-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:10px;background:#e2e8f0;border-bottom:1px solid var(--border-color)}.equipment-tab{min-height:48px;padding:10px 6px;background:transparent;color:#334155;letter-spacing:0;border-radius:8px;font-size:.9rem}.equipment-tab[aria-selected="true"]{background:#001f54;color:white;box-shadow:0 2px 6px #00133830}.equipment-panel[hidden]{display:none!important}.equipment-panel .card{border:0;box-shadow:none;border-radius:0}.equipment-panel .card-header-styled{background:white;color:#001f54;padding:16px 16px 0}.equipment-panel input,.equipment-panel select{min-height:48px;font-size:16px}.equipment-panel button{min-height:48px}.equipment-panel .card-body{gap:14px}.edit-button{width:44px;min-width:44px;height:44px}.inspection-row:has(.inspection-edit){grid-template-columns:1fr}.inspection-edit{grid-template-columns:1fr 1fr}.inspection-edit input,.inspection-edit select{min-height:44px;font-size:16px}.inspection-edit .edit-note{grid-column:span 2}.inspection-edit button{width:100%}.inspection-edit .edit-label{font-size:11px;margin:0;text-transform:none}.inspection-edit label{min-width:0}.inspection-edit .edit-note-label{grid-column:span 2}.inspection-edit .edit-button{width:100%}button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid #0891b2;outline-offset:2px}.cloud-status:hover{background:#ffffff15}
 @media(max-width:768px){.cloud-status-text{display:none}.header-inner{gap:6px}.cloud-status-wrap{margin-left:8px}.header-title{white-space:normal}.equipment-tabs{gap:3px;padding:8px}.equipment-tab{font-size:.85rem}}
 </style>
-<link rel="stylesheet" href="./madmartian-v2.css?v=1">
+<link rel="stylesheet" href="./madmartian-v2.css?v=2">
 </head>
 <body>
 <header><div class="header-inner"><img src="./eod-icon.PNG" class="header-icon-img" alt="EOD Icon"><div class="header-title">EOD Inspection Report</div></div><div class="cloud-status-wrap"><button id="cloudStatus" class="cloud-status" type="button" data-state="idle" aria-label="Choose a terminal" title="Choose a terminal"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M11 31h20a7 7 0 0 0 0-14 11 11 0 0 0-21-3 8.5 8.5 0 0 0 1 17Z" fill="currentColor" fill-opacity=".18" stroke="currentColor" stroke-width="2.5"/><path class="cloud-check" d="m14 22 4 4 8-9" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button><span id="cloudStatusText" class="cloud-status-text" role="status" aria-live="polite">Choose a terminal</span></div><div class="header-logo"><div class="logo-text"><span class="brand-name">ASPECT</span><span class="brand-sub">ASSOCIATES</span></div></div></header>
@@ -163,7 +163,7 @@ equipmentTabs.forEach((tab,index)=>{tab.addEventListener('click',()=>activateTab
 </script>
 <script src="./milestone.js?v=3"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script src="./outlook-sync.js?v=15"></script>
-<script src="./madmartian-v2.js?v=1"></script>
+<script src="./outlook-sync.js?v=16"></script>
+<script src="./madmartian-v2.js?v=2"></script>
 </body>
 </html>
